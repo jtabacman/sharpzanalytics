@@ -1,0 +1,293 @@
+# venue: press_cycle
+# Usado por: crisis_response (parcial), narrative_framing
+# Setting default: broadcast_one_to_many + digital_threaded
+
+venue: press_cycle
+version: "1.0.0"
+status: active
+
+description: >
+  Ciclo de cobertura mediática 24h. Un stimulus (announcement, event, statement)
+  se convierte en story. Multiple outlets compiten por el framing, algunos follow,
+  otros contest. Analysts publican notas, Twitter commentary amplifica, competitors
+  responden. El venue modela quién DEFINE el framing primero (first-mover advantage
+  narrativo) y cómo ese framing persiste o se fragmenta.
+
+used_by_test_types:
+  - narrative_framing
+  - crisis_response (parcial — combined con split_public_private)
+  - controversial_launch (parcial — combined con polarized_social)
+
+setting:
+  default_category: broadcast_one_to_many
+  combined_with: digital_threaded  # analyst threads + social commentary
+  rationale: >
+    Press cycle en 2025+ es híbrido: articles broadcast (one-to-many) + social
+    commentary threaded (many-to-many). El venue modela ambos canales como
+    acoplados — un writeup puede citar tweets, tweets pueden responder a writeups.
+
+channels:
+  - id: press_release_official
+    description: >
+      Comunicado oficial del subject (empresa, organización, campaign). Broadcast
+      puro. Setea la versión oficial que otros outlets van a aceptar, matizar,
+      o contestar.
+    visibility: all
+    length_words: {min: 100, max: 500}
+    formality: very_high
+    actor_types: [company_or_subject]
+    frequency: "1 por variant + opcional follow-up clarification"
+
+  - id: journalist_writeup
+    description: >
+      Artículo de outlet covering la story. Incluye quotes, context, editorial
+      stance. El primer writeup de un outlet 'establishes its line' — followups
+      mismo outlet son consistent. Outlets diferentes pueden discrepar.
+    visibility: all
+    length_words: {min: 300, max: 900}
+    formality: high
+    actor_types: [media_outlet, journalist]
+    frequency: "2-8 por variant dependiendo de story legs"
+
+  - id: analyst_note
+    description: >
+      Nota de analista (equity research, industry analyst, think tank). Tono
+      sobrio, con numbers, perspective larga. Influye en tomas institucionales.
+      Más weight en markets + policy que en consumer.
+    visibility: all
+    length_words: {min: 200, max: 700}
+    formality: very_high
+    actor_types: [analyst, think_tank_expert]
+    frequency: "1-3 por variant cuando la story tiene market implications"
+
+  - id: social_commentary
+    description: >
+      Tweets / posts / threads de journalists + experts + punditry class
+      reaccionando a la story. Más directo que writeup, opinado. Amplifica o
+      disputa el framing.
+    visibility: all
+    length_words: {min: 20, max: 200}
+    formality: medium
+    actor_types: [journalist, analyst, opinion_leader, expert]
+    frequency: "high"
+
+  - id: competitor_response
+    description: >
+      Statement de competitor tomando posición sobre la story. Generalmente
+      cuidadoso (frequency_cap bajo) porque atacar puede volver en contra.
+    visibility: all
+    length_words: {min: 50, max: 300}
+    formality: high
+    actor_types: [competitor]
+    frequency_cap: low  # max 1-2 en la sim
+
+  - id: off_the_record_briefing
+    description: >
+      Briefing privado de la empresa a journalists selectos. No citado
+      directamente, pero influencia el framing. Invisible salvo por cambios en
+      writeup stance subsiguiente.
+    visibility: implicit_only  # efecto sin direct quote
+    length_words: {min: 100, max: 400}
+    actor_types: [company_communications, journalist]
+    frequency_cap: low  # rare pero impactful
+
+visibility_matrix:
+  subject_company:
+    sees:
+      - all_writeups
+      - own_press_release
+      - analyst_notes
+      - social_commentary
+      - competitor_response
+      - own_off_the_record_briefings
+    does_not_see:
+      - pre_publish_drafts_other_outlets
+      - analyst_pre_publication_notes
+
+  media_outlet / journalist:
+    sees:
+      - press_release_official
+      - peer_writeups (critical — journalists track each other)
+      - social_commentary (read Twitter/X for signal)
+      - analyst_notes
+      - off_the_record_briefings (if recipient)
+    special: "Journalists CITE each other. Un writeup puede referenciar 'as Financial Times reported earlier...'"
+
+  analyst:
+    sees: [press_release, writeups, peer_analyst_notes, social_commentary]
+    special: "Analysts lean on primary docs + peer analyses. No van tanto a social."
+
+  competitor:
+    sees: [press_release, writeups, analyst_notes, social_commentary]
+    special: "Competitors toman posición solo si el impact es significativo en su vertical."
+
+  general_public (NOT agent, external audience):
+    special: "Modelado indirecto — no hay agents 'public' en press_cycle. La reacción pública vive en social_viral o polarized_social si se combina."
+
+turn_dynamics:
+  mode: 24h_news_cycle
+  description: >
+    Press cycle es time-compressed. Primer outlet define initial frame (6-12h).
+    Segunda wave de outlets follow + tweak (12-24h). Analyst notes + long-form
+    (24-48h). Social commentary amplifica throughout.
+
+  phases:
+    - phase: stimulus_release
+      rounds: 1
+      actor: company_or_subject
+      channel: press_release_official
+      timing: "hour 0"
+
+    - phase: first_wave_writeups
+      rounds: {min: 2, default: 3, max: 5}
+      actor: media_outlet
+      actor_selection: "weighted by speed + niche_relevance"
+      channel: journalist_writeup
+      timing: "hour 1-8"
+      description: >
+        Los outlets más rápidos publican. Primero usualmente el wire service
+        (Reuters, Bloomberg, AP). Luego trade publications. Cada writeup tiene
+        FRAMING implícito — headline + lede establecen la lente.
+
+    - phase: social_commentary_amplification
+      rounds: {min: 3, default: 4, max: 6}
+      actor: [journalist, analyst, opinion_leader, expert]
+      channel: social_commentary
+      timing: "parallel to first_wave y coverage_entrenchment"
+      description: >
+        Tweets/threads comentan writeups, agregan takes, disputan framings.
+        Esta es la 'pelea por la narrativa' visible.
+
+    - phase: analyst_depth
+      rounds: {min: 1, default: 2, max: 4}
+      actor: analyst
+      channel: analyst_note
+      timing: "hour 8-48"
+      description: >
+        Analysts publican notes con numbers + perspective. Calibra el weight
+        institucional del story.
+
+    - phase: follow_up_writeups
+      rounds: {min: 2, default: 3, max: 5}
+      actor: media_outlet
+      channel: [journalist_writeup, competitor_response (if applicable)]
+      timing: "day 2-5"
+      description: >
+        Segunda wave: outlets que llegaron tarde al primero hacen deeper dive.
+        Competitor puede agregar posicionamiento. El framing o se consolida o
+        se fragmenta.
+
+    - phase: decay_or_legs
+      rounds: {min: 1, default: 2, max: 3}
+      actor: subset
+      channel: [journalist_writeup, social_commentary]
+      timing: "day 5-10"
+      description: >
+        Story muere (news cycle moves on) o tiene legs (segundo round por data
+        nueva, escándalo lateral, follow-up event). Metric importante: time_to_decay.
+
+propagation_rules:
+  - id: first_mover_framing_advantage
+    rule: >
+      El primer writeup setea 35-50% probabilidad de que outlets subsiguientes
+      adopten el mismo framing. Outlets con contrarian editorial line pushback.
+
+  - id: wire_service_baseline
+    rule: "Si un wire service (Reuters/AP/Bloomberg) publica neutral factual piece primero, genera 'baseline truth' que otros modifican."
+
+  - id: off_the_record_shifts_tone
+    rule: "Un briefing off_the_record puede mover writeup tone de 'critical' a 'nuanced' — invisible to outside pero detectable via consistency anomalies."
+
+  - id: social_commentary_feeds_back
+    rule: "Journalist ve tweets de peers y puede ajustar su follow-up writeup. Feedback loop entre social y writeup."
+
+  - id: analyst_note_institutional_weight
+    rule: "Un analyst note con strong stance (upgrade/downgrade) suele triggerar follow-up writeup que cite the note — amplifica by ~2x."
+
+  - id: competitor_restraint_applies
+    rule: "Competitor no se tira agresivo. Statement usualmente en tono 'our company's approach differs in that...' — indirecto."
+
+  - id: counter_framing_window
+    rule: "La contra-narrative tiene 48-72h window. Después del día 3, el framing dominante se cristaliza y cambiarlo requiere event nuevo."
+
+special_behaviors:
+  - name: framing_war_detection
+    description: >
+      El venue identifica los 2-3 frames dominantes competiendo. Tracks outlets
+      alineados con cada frame + outlets mixtos. Output: 'Frame A ganó 54%
+      share of coverage, Frame B 31%, Frame C 15%'. Essential para
+      narrative_framing test_type.
+
+  - name: time_to_decay
+    description: "Días hasta que el coverage drops below N writeups/day threshold. Metric para measuring story legs."
+
+  - name: narrative_stickiness
+    description: >
+      ¿El frame original (del press release) sobrevivió en el coverage final, o
+      fue reemplazado? % de writeups que preservan el frame original.
+
+  - name: hidden_briefing_effect
+    description: "Cuando off_the_record_briefing se usa, el venue muestra si fue effective — ¿los outlets briefed cambiaron stance comparado con no-briefed?"
+
+qa_hints_per_stage:
+  post_stage_2:
+    - outlet_coverage_relevance  # los outlets cubren esta industry/vertical?
+    - analyst_institution_match  # el analyst extraído trabaja en institution que cubre este vertical?
+    - competitor_real_competitor  # como en split_public_private
+
+  post_stage_4:
+    - persona_coherence
+    - editorial_line_consistency  # un outlet con editorial conservative no escribe un take progressive sin signal
+    - factual_hallucination  # especialmente números en analyst_note
+    - quote_attribution  # si el writeup 'cita' al subject, la quote debe match press_release literal o ser off_the_record plausible
+    - temporal_realism  # writeups publicados en orden creíble
+    - competitor_coherence  # no apoyo gratuito
+    - journalist_independence  # writeups de outlets diferentes NO deben ser copy-paste
+    - off_the_record_invisibility  # si se usó briefing off-record, no aparece citado directo
+
+  post_stage_6:
+    - framing_war_tree_faithful  # el tree refleja actual writeups
+    - time_to_decay_calibrated
+
+  post_stage_7:
+    - narrative_stickiness_verifiable
+    - first_mover_advantage_quantified
+
+stimulus_delivery:
+  format: announcement_or_event
+  round: 1
+  content_template: >
+    "Round 1 — stimulus: {event_or_announcement}. Released by: {subject}. Timing:
+     {context}. Initial channels (subject's own): {initial_distribution}."
+  panel_sees: press_release_full + contextual_metadata
+
+metrics_surfaced:
+  primary:
+    - framing_share_of_coverage  # % por frame
+    - narrative_stickiness_pct  # ¿sobrevive el frame original?
+    - time_to_decay_days
+    - negative_sentiment_coverage_pct
+    - analyst_stance_distribution
+
+  secondary:
+    - first_mover_framing_identified
+    - counter_framing_strength
+    - social_commentary_volume
+    - off_the_record_effectiveness (if used)
+    - follow_up_wave_strength
+
+  for_narrative_framing:
+    - message_stickiness_by_audience
+    - narrative_mutation_per_outlet
+    - best_framing_per_segment
+
+  for_crisis_response:
+    - simulated_press_coverage_arc_10d  # combined with split_public_private
+    - escalation_vs_settlement_trajectory
+
+limits_of_venue:
+  - "No modela paywall effects (FT, WSJ content reach es distinto)"
+  - "Regional press (ej. LatAm trade) tiene menos coverage data en modelo"
+  - "Ownership ties (outlet owned by conglomerate) no modelados explícitamente"
+  - "No capta visual journalism (infographics, data viz, documentaries)"
+  - "Off-the-record effects son approximations — real insider dynamics complejos"

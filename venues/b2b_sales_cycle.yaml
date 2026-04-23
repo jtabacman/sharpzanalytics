@@ -1,0 +1,323 @@
+# venue: b2b_sales_cycle
+# Usado por: b2b_pricing
+# Setting default: hybrid_multi_channel (demo + Slack interno + email procurement + CFO memo)
+
+venue: b2b_sales_cycle
+version: "1.0.0"
+status: active
+
+description: >
+  Ciclo de venta enterprise B2B con múltiples stakeholders en el buying team.
+  Multi-canal + multi-phase: vendor demo → internal Slack discussion → procurement
+  email negotiation → CFO approval memo → contract redlines. Dinámica LENTA
+  (días/semanas entre rounds) con stakeholders que aportan perspectives distintas
+  (technical evaluator, end user, finance, legal, leadership).
+
+used_by_test_types:
+  - b2b_pricing
+
+setting:
+  default_category: hybrid_multi_channel
+  subsettings_per_channel:
+    vendor_demo: {category: in_person_meeting, formality: high}
+    internal_slack: {category: messaging_private, formality: medium_low}
+    procurement_email: {category: email_async, formality: high}
+    cfo_memo: {category: email_async, formality: very_high}
+    contract_redlines: {category: email_async, formality: very_high}
+  rationale: >
+    Una decisión B2B enterprise NUNCA se toma por una sola persona o en un solo
+    canal. Es orchestrated across stakeholders con poder distinto, timelines
+    distintos, y concerns distintos. Modelar el venue como multi-canal captura
+    la realidad del sales cycle.
+
+channels:
+  - id: vendor_demo
+    description: >
+      Account executive del vendor presenta al buying team. 5-10 stakeholders
+      presentes. Demo + pricing overview + Q&A. Es round 1 del venue.
+    visibility: demo_attendees
+    length_words: {min: 200, max: 800}
+    formality: high
+    actor_types: [vendor_ae]  # sintético, derivado del brief/pricing deck
+    frequency: "1 per variant"
+
+  - id: demo_question
+    description: >
+      Pregunta del buying team durante el demo. Típicamente del technical_eval
+      o end_user — NO del CFO (CFO pregunta después).
+    visibility: demo_attendees
+    length_words: {min: 15, max: 100}
+    formality: high
+    actor_types: [technical_eval, end_user]
+    frequency: "4-8 durante demo"
+
+  - id: internal_slack_thread
+    description: >
+      Discusión interna del buying team en Slack (o Teams) post-demo. Cada
+      stakeholder aporta perspectiva. Tone casual, directo, revelador.
+    visibility: buying_team_only
+    length_words: {min: 20, max: 150}
+    formality: medium_low
+    actor_types: [technical_eval, end_user, leadership, finance_ops]
+    frequency: "high — 20-40 messages in a thread"
+
+  - id: procurement_email
+    description: >
+      Email formal de procurement al vendor negociando terms. "Solicitamos
+      descuento X% por commitment multi-year", "precio de línea Y es high vs
+      benchmark", "necesitamos SLA upgrades". Tono formal pero directo.
+    visibility: procurement_and_vendor_ae
+    length_words: {min: 80, max: 300}
+    formality: high
+    actor_types: [procurement]
+    frequency: "2-4 intercambios en el ciclo"
+
+  - id: cfo_approval_memo
+    description: >
+      Memo de finance al CFO (o del CFO al CEO) pidiendo approval del spend.
+      Sintetiza business case + ROI + risk. Tono very_high formality. Es el
+      gate final antes del contract.
+    visibility: finance_leadership_only
+    length_words: {min: 200, max: 600}
+    formality: very_high
+    actor_types: [finance_ops, leadership]
+    frequency: "1-2 memos"
+
+  - id: contract_redlines
+    description: >
+      Legal/procurement manda version redlined del contract con changes
+      propuestos. Vendor counter-redlines. Ciclo puede ir 3-5 rounds. Tono
+      very_high formality, preciso.
+    visibility: legal_procurement_vendor_legal
+    length_words: {min: 100, max: 400}
+    formality: very_high
+    actor_types: [procurement, legal, vendor_ae]
+    frequency: "2-4 rounds per contract"
+
+  - id: end_user_gripe_private
+    description: >
+      Un end_user que está escéptico del tool manda DM privado a colega
+      "este es el tercer tool que nos quieren meter este año". Signal de
+      adoption risk.
+    visibility: dyadic_same_team
+    length_words: {min: 15, max: 80}
+    formality: low
+    actor_types: [end_user]
+    frequency: "3-8 messages distribuidos"
+
+  - id: competitor_mention_in_deliberation
+    description: >
+      En internal_slack o cfo_memo, el buying team menciona competitor como
+      benchmark ("Snowflake charges X for similar", "we could build in-house
+      for Y"). Competitor NO es actor — es reference.
+    visibility: internal
+    actor_types: [all_buying_team]
+    frequency: "frequent — modelado como pattern, no action"
+
+visibility_matrix:
+  vendor_ae:
+    sees:
+      - vendor_demo
+      - demo_question
+      - procurement_email (exchange)
+      - contract_redlines (vendor side)
+    does_not_see:
+      - internal_slack_thread
+      - cfo_approval_memo
+      - end_user_gripe_private
+    special: "El vendor ve SOLO lo que llega oficialmente. Flying blind sobre la deliberation interna."
+
+  technical_eval:
+    sees: [vendor_demo, demo_question, internal_slack_thread (participa)]
+    does_not_see: [cfo_memo, contract_redlines (usually)]
+
+  end_user:
+    sees: [vendor_demo_if_invited, internal_slack_thread, own_gripes]
+    does_not_see: [procurement_email, cfo_memo, contract_redlines]
+
+  leadership:
+    sees: [internal_slack_thread (lurks mostly), cfo_memo, procurement_summary]
+    special: "Leadership habla poco en Slack pero lee. Voz definitoria en cfo_memo."
+
+  finance_ops / cfo:
+    sees: [demo_summary, internal_slack, procurement_email, own_cfo_memo]
+    special: "CFO no está en el demo usually — recibe summary + pricing doc."
+
+  legal / procurement:
+    sees: [contract_redlines, procurement_email, legal_requirements]
+
+turn_dynamics:
+  mode: multi_phase_slow
+  description: >
+    B2B cycle es slow — días/semanas entre phases. Cada phase tiene su actor set
+    principal + timing prolongado. El venue COMPRESSES real-world timelines
+    (typical 45-90 day sales cycle → minutos de sim) pero mantiene proportions.
+
+  phases:
+    - phase: demo_delivery
+      rounds: {min: 1, default: 1}
+      actor: vendor_ae_plus_buying_team
+      channel: [vendor_demo, demo_question]
+      timing: "simulated 1-2 hour demo meeting"
+      description: "AE presenta, buying team asks questions."
+
+    - phase: immediate_internal_debrief
+      rounds: {min: 3, default: 4, max: 6}
+      actor: buying_team_internal
+      channel: internal_slack_thread
+      timing: "simulated 1-3 days post demo"
+      description: "Thread interno procesando el demo. Cada stakeholder opina."
+
+    - phase: procurement_negotiation
+      rounds: {min: 2, default: 3, max: 5}
+      actor: [procurement, vendor_ae]
+      channel: procurement_email
+      timing: "simulated 1-3 weeks"
+      description: "Back-and-forth sobre pricing, SLA, terms."
+
+    - phase: financial_approval_process
+      rounds: {min: 1, default: 2, max: 3}
+      actor: [finance_ops, leadership]
+      channel: cfo_approval_memo
+      timing: "simulated 3-7 days"
+      description: "Memo al CFO. Gate final de spend."
+
+    - phase: legal_contract
+      rounds: {min: 2, default: 3, max: 5}
+      actor: [legal, procurement, vendor_ae]
+      channel: contract_redlines
+      timing: "simulated 2-4 weeks"
+      description: "Contract redlines hasta close or drop."
+
+    - phase: pre_close_signals
+      rounds: {min: 1, default: 2, max: 3}
+      actor: buying_team_partial
+      channel: [internal_slack_thread, end_user_gripe_private]
+      timing: "paralelo a legal_contract"
+      description: "Final gossip interno. End user gripes surface. Champion vs detractor final stance."
+
+propagation_rules:
+  - id: stakeholder_blocking_power
+    rule: >
+      CFO y legal tienen hard-block power. Un 'no' de CFO mata el deal. Si el
+      CFO memo recomienda reject, subsiguientes phases no ocurren (path cancel_pre_legal).
+
+  - id: end_user_adoption_risk_signal
+    rule: >
+      Si end_user_gripe_private passes threshold (>2 agents con gripe, unresolved),
+      el deal puede avanzar pero con adoption_risk_score high — surfaceado en
+      reporte como warning.
+
+  - id: champion_amplifies_positives
+    rule: >
+      Un technical_eval con alta enthusiasm (persona tagged: 'champion') posts
+      más en Slack pro-tool. Efecto: amplifica perceived value en el buying team.
+
+  - id: procurement_discount_pressure
+    rule: >
+      Procurement SIEMPRE pide discount. Baseline ask: 15-20%. Vendor response
+      strategy (hold firm / flex / creative packaging) determina si el deal
+      closes at list o con concession.
+
+  - id: slow_channel_asymmetry
+    rule: >
+      Email y contract_redlines tienen natural latency (1-3 días entre rounds
+      simulados). Slack es real-time. El venue respeta proportions.
+
+  - id: vendor_blindness_to_internal
+    rule: >
+      Vendor AE NO ve internal_slack. Debe inferir del tone de procurement_email
+      y demo_question qué está pasando. Es tension modelado.
+
+  - id: competitor_ghost_influence
+    rule: >
+      Competitor NO es actor pero es referenciado. Si el buying team menciona
+      'Snowflake is X/year with Y features', crea anchor contra el cual el
+      vendor's pricing se compara.
+
+special_behaviors:
+  - name: deal_velocity_tracking
+    description: "Días totales de demo → close (or drop). Metric primario."
+
+  - name: stakeholder_alignment_score
+    description: >
+      % de buying team con positive stance al final del ciclo. Si <60%, el deal
+      puede cerrar pero con churn risk Y1 alta.
+
+  - name: discount_captured
+    description: "Diferencia entre list price y close price. Indicador de leverage."
+
+  - name: feature_tradeoff_preferences
+    description: >
+      Durante Slack thread, stakeholders priorizan features. El venue agrega
+      ranking per segment. Útil para product roadmap hints.
+
+  - name: expansion_probability_y2
+    description: >
+      Del tone del buying team + features not-purchased que mencionaron, estimar
+      probabilidad de expansion (upsell) en year 2.
+
+  - name: champion_vs_detractor_identification
+    description: >
+      El venue identifica con nombre quién fue el champion interno (signed most
+      positives) vs detractor (most gripes). Util post-sale para account
+      strategy.
+
+qa_hints_per_stage:
+  post_stage_2:
+    - buying_team_composition_plausible  # Technical eval + end user + leadership + finance + legal presentes?
+    - icp_match_to_test_subject  # buying team en una company que realmente compraria esto?
+    - procurement_role_senior_enough  # no procurement jr para deal de $500K
+
+  post_stage_4:
+    - persona_coherence
+    - stakeholder_role_consistency  # CFO no postea en Slack casual '@here let's ship it'
+    - competitor_reference_real  # competitor mencionado tiene sentido (Snowflake para data, no para HR)
+    - procurement_hardball_plausibility  # procurement pide descuentos razonables, no absurdos
+    - contract_terms_relevance  # redlines sobre terms típicos, no about the weather
+    - slack_tone_vs_memo_tone  # Slack casual, CFO memo formal
+    - timing_compression_proportion  # phases respetan relative duration
+    - champion_detractor_both_present  # si todos support o todos oppose, flag
+
+  post_stage_6:
+    - deal_outcome_coherent  # el outcome matches the signals
+    - stakeholder_alignment_honest  # no overclaim alignment
+
+  post_stage_7:
+    - expansion_probability_calibrated
+    - adoption_risk_surfaced
+
+stimulus_delivery:
+  format: pricing_deck_plus_demo_script
+  round: 1
+  content_template: >
+    "Round 1 — vendor_ae presents {pricing_variant}. Tiers: {tiers}. Headline features:
+     {features}. Standard terms: {terms}. Demo covers: {demo_structure}."
+  panel_sees: full_pricing_deck + feature_overview
+
+metrics_surfaced:
+  primary:
+    - deal_velocity_days  # demo to close
+    - discount_pressure_pct
+    - stakeholder_alignment_score
+    - feature_tradeoff_rankings
+    - expansion_probability_y2
+
+  secondary:
+    - champion_identification (with name)
+    - detractor_identification (with name)
+    - adoption_risk_score
+    - contract_redline_friction_points
+    - budget_fit_vs_stretch
+
+  for_b2b_pricing:
+    - recommended_pricing_architecture
+    - tier_capturing_most_revenue
+    - discount_guardrails
+
+limits_of_venue:
+  - "Real cycles son 2-9 meses. El venue modela proportions, no absolute timing."
+  - "Multi-threaded deals (múltiples buying committees paralelos) no modelados en v0"
+  - "POC/trial mechanics no incluidos — el venue asume demo → contract sin POC stage"
+  - "Pricing psychology sutil (anchor effects de tier structure) es approximation"
+  - "No capta relationship-based selling (warm intros, reference calls)"

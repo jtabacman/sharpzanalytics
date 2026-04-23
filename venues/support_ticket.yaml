@@ -1,0 +1,221 @@
+# venue: support_ticket
+# Usado por: churn_analysis, crisis_response (parcial)
+# Setting default: phone_support + email_async
+
+venue: support_ticket
+version: "1.0.0"
+status: active
+
+description: >
+  Canal 1-on-1 customer ↔ support agent + el flow interno de escalation. Customer
+  inicia ticket (queja, request, incident), support responde, puede haber
+  escalation interna, thread continua hasta resolution (o abandono). Usado
+  primariamente para churn_analysis (testing retention interventions) y parcial
+  para crisis_response (tickets como síntoma de crisis).
+
+used_by_test_types:
+  - churn_analysis
+  - crisis_response  # partial — combined with split_public_private
+  - brand_sentiment_shift  # partial — tickets as sentiment data
+
+setting:
+  default_category: phone_support  # o email_async según variant
+  variants:
+    - phone_call: "synchronous, emotional, resolution-in-call"
+    - email_thread: "async, written, multi-round"
+    - chat_live: "sync text, fast, mixed outcomes"
+    - cancel_flow: "self-serve UI + optional retention call"
+  rationale: >
+    Support tickets son el primer síntoma de churn y la última oportunidad de
+    save. La calidad del response + intervention strategy es el core variable
+    que el test evalúa.
+
+channels:
+  - id: customer_initial_ticket
+    description: "Request inicial del customer. Queja, issue, cancel intent, upgrade ask. Establece tone + specific complaint."
+    visibility: customer_and_support
+    length_words: {min: 30, max: 200}
+    formality: medium_low
+    actor_types: [at_risk_customer, cancelling_customer, churned_customer_reach_out]
+    frequency: "1 por customer enter flow"
+
+  - id: support_response
+    description: "Respuesta del support agent. Puede ser empathic + resolving, formulaic, escalating, or cold. Es la variant bajo test."
+    visibility: customer_and_support
+    length_words: {min: 50, max: 300}
+    formality: medium
+    actor_types: [support_agent]  # sintético derivado del intervention variant
+    frequency: "N per ticket thread"
+
+  - id: customer_followup
+    description: "Reply del customer a support response. Puede amplificar anger, accept resolution, or abandon."
+    visibility: customer_and_support
+    length_words: {min: 20, max: 150}
+    formality: medium_low
+    actor_types: [same_customer]
+    frequency: "0-5 per thread"
+
+  - id: internal_escalation_memo
+    description: >
+      Support agent escalates internally: 'customer at risk, needs CS call', o
+      manager flag. Privado dentro de company. Marks priority.
+    visibility: support_team_internal
+    length_words: {min: 30, max: 150}
+    formality: medium_high
+    actor_types: [support_agent, support_manager]
+    frequency: "subset — when customer signals high churn risk"
+
+  - id: cs_retention_call
+    description: >
+      Customer Success call con at-risk customer. Longer, personal, offers
+      available. Part of intervention variant.
+    visibility: customer_and_cs
+    length_words: {min: 100, max: 400}
+    formality: medium
+    actor_types: [cs_manager, customer]
+    frequency: "for intervention variants that include CS outreach"
+
+  - id: public_review_post
+    description: >
+      Customer deja review public post-experience (G2, Trustpilot, Twitter,
+      LinkedIn). Puede ser positive (save stories) o negative (warning).
+      Impacts acquisition funnel separately.
+    visibility: all
+    length_words: {min: 30, max: 200}
+    formality: medium
+    actor_types: [customer]
+    frequency: "15-25% of ticket customers leave review"
+
+visibility_matrix:
+  customer:
+    sees: [own_ticket_thread, cs_call_if_scheduled, own_review]
+    does_not_see: [internal_escalation_memos, other_customers_tickets]
+
+  support_agent:
+    sees: [own_tickets, internal_escalations (tags), customer_followups]
+    does_not_see: [other_support_agents_tickets_unless_shared]
+
+  cs_manager:
+    sees: [escalated_tickets, cs_call_transcripts, retention_playbook_triggers]
+
+  public (if review_posted):
+    sees: [public_reviews_only]
+
+turn_dynamics:
+  mode: async_ticket_threads_parallel
+  description: >
+    Multiple customer tickets run in parallel (each agent may have own thread).
+    Each thread has multi-round but compressed. Venue tracks per-customer
+    outcome + aggregates.
+
+  phases:
+    - phase: intervention_variant_setup
+      rounds: 0  # pre-sim
+      description: "Variant defines what intervention strategy support uses: no_intervention / discount_offer / feature_unlock / cs_call."
+
+    - phase: ticket_creation_wave
+      rounds: {min: 1, default: 1}
+      actor: at_risk_customers
+      channel: customer_initial_ticket
+      timing: "all customers initiate within compressed window"
+
+    - phase: support_response_wave
+      rounds: {min: 1, default: 2, max: 3}
+      actor: support_agent
+      channel: [support_response, internal_escalation_memo]
+      timing: "1-48h per response"
+      description: "Support responds per variant strategy. Some escalate."
+
+    - phase: customer_reaction_loop
+      rounds: {min: 1, default: 2, max: 4}
+      actor: [customer, support_agent]
+      channel: [customer_followup, support_response]
+      timing: "1-7 days per round"
+      description: "Back-and-forth until resolution or abandonment."
+
+    - phase: optional_cs_call
+      rounds: {min: 0, default: 1, max: 1}
+      actor: [cs_manager, customer]
+      channel: cs_retention_call
+      timing: "3-14 days post initial ticket"
+      description: "For variants including CS outreach."
+
+    - phase: outcome_and_review
+      rounds: {min: 1, default: 1}
+      actor: customer
+      channel: [decision_retain_or_churn, optional_public_review]
+      timing: "day 14-30"
+      description: "Final outcome: retain (saved), churn (gone), downgrade, upgrade. Optional review."
+
+propagation_rules:
+  - id: no_cross_customer_influence_direct
+    rule: "Customers en distintos threads NO se influencian directly (tickets privados). But reviews public can affect wider acquisition (out-of-scope del venue)."
+
+  - id: intervention_effectiveness_variable
+    rule: "Variant dicta strategy. Metric: retention rate POR variant + customer profile."
+
+  - id: residual_trust_damage
+    rule: "Un customer 'saved' pero con bad interaction puede retain short-term pero churn 6mo later. Venue modela confidence-weighted retention."
+
+  - id: no_intervention_baseline
+    rule: "Always include 'no intervention' variant. A veces, NOT intervening es superior (intervention may backfire if bad)."
+
+  - id: escalation_as_effort_signal
+    rule: "Escalation a CS call is positive signal to customer IF timely. Late escalation (after frustration maxed) backfires."
+
+special_behaviors:
+  - name: retention_by_segment_and_intervention
+    description: "Grid: which intervention works for which customer profile (at_risk, cancelling, churned-reactivate, healthy)."
+
+  - name: no_intervention_baseline_comparison
+    description: "Critical control. A veces the best strategy is no intervention — trying saves can accelerate churn."
+
+  - name: early_churn_signals_identified
+    description: "From support thread patterns, identify signals that predict churn earlier (usage drop + tone shift + request type)."
+
+  - name: cost_of_intervention_vs_ltv_preserved
+    description: "Economic calculation: intervention_cost per saved customer vs LTV."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - customer_segment_plausibility  # at_risk vs cancelling vs churned plausible by persona
+    - support_agent_role_realistic  # not a fortune teller, works within playbook
+
+  post_stage_4:
+    - persona_coherence
+    - support_tone_matches_variant  # empathic variant sounds empathic
+    - escalation_trigger_realistic
+    - customer_escalation_proportional  # no over-escalation or under-escalation
+    - no_public_leak_private_threads
+
+  post_stage_7:
+    - no_intervention_baseline_present  # critical
+    - segment_specific_recommendations
+    - ltv_calculation_present_if_claimed
+
+stimulus_delivery:
+  format: intervention_variant_plus_customer_profiles
+  round: 1
+  content_template: >
+    "For each at-risk customer in panel, an initial ticket issue is assigned
+     based on their profile. Support responds per variant: {intervention_strategy}."
+
+metrics_surfaced:
+  primary:
+    - retention_rate_per_intervention
+    - reactivation_rate_for_churned
+    - residual_trust_damage_score
+    - cost_per_saved_customer
+    - ltv_preserved_per_dollar_spent
+
+  secondary:
+    - early_churn_signal_types_ranked
+    - customer_effort_score
+    - nps_delta_post_interaction
+    - public_review_sentiment_distribution
+
+limits_of_venue:
+  - "Real customer relationships have history venue doesn't fully model"
+  - "Industry-specific support norms vary (B2B SaaS vs consumer app very different)"
+  - "Long-tail outcomes (6mo+ retention) extrapolated, not simulated directly"
+  - "Cultural factors en complaint styles (US vs LATAM vs APAC) approximated"

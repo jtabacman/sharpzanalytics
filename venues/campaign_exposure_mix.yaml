@@ -1,0 +1,240 @@
+# venue: campaign_exposure_mix
+# Usado por: campaign_planning
+# Setting default: hybrid_multi_channel
+
+venue: campaign_exposure_mix
+version: "1.0.0"
+status: active
+
+description: >
+  Modela una campaña multi-canal con diferencial de exposure entre agents.
+  Subsets del panel reciben distinta combinación de touchpoints (full-exposure,
+  partial, zero-exposure control). Permite medir incremental lift por touchpoint,
+  saturation onset, wasted spend. Combinado con elementos de social_viral +
+  press_cycle + word-of-mouth.
+
+used_by_test_types:
+  - campaign_planning
+
+setting:
+  default_category: hybrid_multi_channel
+  channels_included:
+    - social_feed: {setting: digital_feed}
+    - press: {setting: broadcast_one_to_many}
+    - wom: {setting: messaging_private}
+    - event: {setting: in_person_panel}
+  rationale: >
+    Real campaigns viven across channels. El test key es medir qué canal aporta
+    incremental lift vs redundante vs saturación. Requiere exposure_differential
+    setup.
+
+channels:
+  - id: social_feed_exposure
+    description: "Campaign ad/post seen in social feed. Weight varies by exposure tier del agent."
+    visibility: exposure_tier_dependent
+    length_words: {min: 20, max: 150}
+    actor_types: [consumer, amplifier]
+    frequency: "varies per exposure_tier"
+
+  - id: press_coverage_exposure
+    description: "Press article or editorial. Some agents read (subset that consumes media)."
+    visibility: exposure_tier_dependent
+    length_words: {min: 100, max: 400}
+    actor_types: [media_outlet_article_content]
+    frequency: "1-3 articles in campaign arc"
+
+  - id: wom_referral
+    description: "Friend/peer recommends or mentions campaign message. Dyadic."
+    visibility: dyadic_peer_pairs
+    length_words: {min: 15, max: 80}
+    actor_types: [amplifier, brand_loyalist, peer]
+    frequency: "subset of agents originate; dyadic propagation"
+
+  - id: event_attendance_reaction
+    description: "In-person event (launch party, tentpole activation). Only subset attends."
+    visibility: event_attendees + post_event_content
+    length_words: {min: 30, max: 150}
+    actor_types: [subset_active_agents]
+    frequency: "1 event in campaign typically"
+
+  - id: fatigue_voice
+    description: >
+      Agents expressing 'enough already' / 'I've seen this ad 10 times'. Signal
+      of saturation. Especialmente importante en full-exposure tier.
+    visibility: all (via social)
+    length_words: {min: 15, max: 80}
+    actor_types: [fatigue_voice_segment]
+    frequency: "ramps up in mid-to-late campaign"
+
+  - id: amplification_action
+    description: "Agent amplifies campaign (share, repost, recommend). Multiplier effect."
+    visibility: all
+    length_words: {min: 10, max: 80}
+    actor_types: [amplifier]
+    frequency: "subset, timing-dependent"
+
+exposure_tiers:
+  full_exposure:
+    percentage: 30
+    channels_received: [social_feed, press, wom, event]
+    note: "Receives all touchpoints"
+
+  partial_exposure:
+    percentage: 30
+    channels_received: [social_feed + 1-2 other random]
+    note: "Mixed — to measure incremental contribution of each channel"
+
+  zero_exposure_control:
+    percentage: 20
+    channels_received: []
+    note: "Control group. Ideal has zero exposure to measure baseline."
+
+  amplifier_segment:
+    percentage: 10
+    channels_received: [social_feed, event, amplification_opportunity]
+    note: "Tagged as likely amplifiers. Separate measurement for activation rate."
+
+  fatigue_voice_segment:
+    percentage: 10
+    channels_received: [full_exposure_plus]  # intentionally overexposed
+    note: "Monitors fatigue / backlash onset"
+
+turn_dynamics:
+  mode: campaign_time_phased
+  description: >
+    Campaign has time arc: burst / slow-burn / tentpole. The venue respects
+    the arc type defined by variant.
+
+  phases:
+    - phase: campaign_launch
+      rounds: 1
+      actor: brand
+      channel: [social_feed_exposure, press_coverage_exposure]
+      timing: "week 0 / week 1 burst"
+
+    - phase: sustained_rollout
+      rounds: {min: 4, default: 6, max: 10}
+      actor: [brand_continues, amplifier_activations, media_pickup]
+      channel: [all_campaign_channels]
+      timing: "weeks 2-8 depending on campaign variant"
+      description: "Continued campaign activity per variant architecture."
+
+    - phase: peak_moment
+      rounds: {min: 1, default: 2, max: 3}
+      actor: [brand, event_participants]
+      channel: [event_attendance_reaction, press_coverage_exposure]
+      timing: "week of peak tentpole"
+      description: "Tentpole event or peak media moment."
+
+    - phase: saturation_and_fatigue_monitoring
+      rounds: {min: 2, default: 3, max: 5}
+      actor: [fatigue_voice_segment, broader_panel]
+      channel: [fatigue_voice, reduced_amplification]
+      timing: "back half of campaign arc"
+      description: "Detect fatigue onset, measure amplification decay."
+
+    - phase: post_campaign_decay
+      rounds: {min: 1, default: 2, max: 3}
+      actor: subset
+      channel: [residual_wom, late_press]
+      timing: "1-2 weeks post"
+      description: "Long-tail residual activity."
+
+propagation_rules:
+  - id: exposure_differential_strict
+    rule: "Agents receive ONLY the channels their tier specifies. No information leakage across tiers."
+
+  - id: amplification_cascades_cross_tier
+    rule: >
+      Amplifier's amplification_action can reach agents in OTHER tiers via
+      social_feed_exposure. This is expected — captures viral lift beyond paid
+      reach.
+
+  - id: fatigue_onset_threshold
+    rule: "If >30% of panel references 'seen too much', fatigue onset is declared that round. Warning surfaced."
+
+  - id: touchpoint_attribution
+    rule: >
+      Each amplification or conversion can be attributed to the last touchpoint
+      encountered. Venue tracks for attribution analysis.
+
+  - id: wom_viral_coefficient
+    rule: "wom_referrals initiated in full_exposure can propagate to partial/zero via dyadic. Measured separately."
+
+special_behaviors:
+  - name: incremental_lift_per_touchpoint
+    description: "Compare engagement/intent between tiers receiving specific channel combinations. Isolates contribution."
+
+  - name: saturation_onset_detection
+    description: "Round at which fatigue_voice volume exceeds threshold. Campaign should taper after this."
+
+  - name: amplifier_activation_rate
+    description: "% of amplifier_segment that activated. Low = campaign didn't resonate. High = viral lift."
+
+  - name: wasted_touchpoint_identification
+    description: "Channels with near-zero incremental lift over control. Budget reallocation candidates."
+
+  - name: budget_reallocation_recommendation
+    description: "If cut 25% of spend, which channel/timing to cut with minimal lift loss."
+
+  - name: optimal_sequence_recommendation
+    description: "Ordering analysis: did press-first lift social? Did event-first drive press? Sequence matters."
+
+  - name: competitor_response_window
+    description: >
+      Suggested window where competitor can respond effectively vs risks
+      looking reactive. Informed by saturation and press coverage peaks.
+
+qa_hints_per_stage:
+  post_stage_2:
+    - exposure_tiers_balanced  # percentages match design
+    - control_group_really_unexposed  # no leakage paths
+    - amplifier_segment_plausibly_influential
+    - fatigue_voice_segment_realistic
+
+  post_stage_4:
+    - exposure_differential_preserved  # agents don't reference channels they didn't receive
+    - persona_coherence
+    - amplification_realistic  # not everyone amplifies
+    - wom_propagation_realistic  # bounded dyadic
+    - fatigue_expressed_in_character
+
+  post_stage_7:
+    - incremental_lift_computation_transparent
+    - saturation_threshold_justified
+    - budget_reallocation_evidence_based
+
+stimulus_delivery:
+  format: campaign_architecture_plus_channel_mix
+  round: 1
+  content_template: >
+    "Campaign variant: {arc_type} (burst / slow-burn / tentpole). Budget mix:
+     {pct_per_channel}. Duration: {weeks}. Peak moment: {peak_event}.
+     Audience hint: {target_reach}."
+
+metrics_surfaced:
+  primary:
+    - incremental_lift_per_touchpoint
+    - saturation_onset_week
+    - amplifier_activation_rate
+    - wasted_touchpoints_identified
+    - cross_channel_multiplier
+
+  secondary:
+    - reach_by_tier
+    - wom_viral_coefficient
+    - fatigue_threshold_week
+    - competitive_response_window_estimate
+    - touchpoint_attribution_breakdown
+
+  outputs_unique:
+    - channel_attribution_ranking
+    - budget_reallocation_recommendation
+    - optimal_sequence_recommendation
+
+limits_of_venue:
+  - "Real campaign performance affected by creative quality — venue assumes fixed creative"
+  - "Media buying rate fluctuations not modeled"
+  - "Long-tail brand lift (6+ months) extrapolated"
+  - "Competitive media noise during campaign not simulated (simplified)"
+  - "Cultural moment volatility (events making some campaign tone wrong) not modeled"

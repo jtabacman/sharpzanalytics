@@ -1,0 +1,204 @@
+# venue: product_usage_simulation
+# Usado por: product_launch
+# Setting default: individual_journey (no inter-agent)
+
+venue: product_usage_simulation
+version: "1.0.0"
+status: active
+
+description: >
+  Venue individual — cada agent simula su interacción con el producto day-by-day
+  durante una semana (o más). NO hay deliberation cross-agent. Cada journey es
+  independiente. Genera signal sobre adoption velocity, friction points, feature
+  delight/frustration, y NPS estimate.
+
+used_by_test_types:
+  - product_launch
+
+setting:
+  default_category: individual_journey
+  rationale: >
+    Product usage es por definición individual. Un usuario abre el producto,
+    lo explora, encuentra friction, forma opinión. El cross-agent deliberation
+    puede venir después (retail_decision o social_viral) pero la experiencia de
+    uso en si misma es personal.
+
+channels:
+  - id: day_usage_journal
+    description: >
+      Entry por día simulado. Agent describe su interacción con el producto:
+      qué feature tocó, qué pensó, qué frustró, qué delightó. Modelado como
+      stream of consciousness.
+    visibility: private_internal
+    length_words: {min: 100, max: 400}
+    formality: low
+    actor_types: [user_early_adopter, user_mainstream, user_power, user_skeptic]
+    frequency: "1 entry per day per agent across simulated_days"
+
+  - id: feature_reaction
+    description: >
+      Reaction específica a un feature encountered. Positive delight / neutral /
+      confused / frustrated / abandon intent. Structured data por feature.
+    visibility: private_internal
+    length_words: {min: 20, max: 100}
+    formality: structured
+    actor_types: [all_users]
+    frequency: "per feature interaction — 10-20 per agent"
+
+  - id: day_7_reflection
+    description: >
+      Al fin de simulated_days, agent escribe reflexión resumen: usaría / dejaría /
+      recomendaría. NPS score (0-10) + reason.
+    visibility: private_internal
+    length_words: {min: 100, max: 300}
+    formality: medium_low
+    actor_types: [all_users]
+    frequency: "1 per agent"
+
+  - id: optional_wom_share
+    description: >
+      Subset of agents share experience con peer externally. Acts as bridge
+      to retail_decision venue if combined.
+    visibility: dyadic_external
+    length_words: {min: 15, max: 80}
+    actor_types: [user_early_adopter, user_power]
+    frequency: "20-30% of agents"
+
+  - id: support_ticket_during_use
+    description: >
+      If user hits friction and opens ticket. Connects to support_ticket venue
+      when combined for product_launch + onboarding tests.
+    visibility: customer_and_support
+    length_words: {min: 30, max: 200}
+    actor_types: [user_mainstream, user_skeptic]
+    frequency: "5-15% of users per frictioned feature"
+
+visibility_matrix:
+  individual_agent:
+    sees: [own_journey, own_support_interaction]
+    does_not_see: [other_agents_journeys]
+    rationale: "Core venue is individual."
+
+  company_analytics:
+    sees: [aggregate_feature_usage, support_patterns, nps_distribution]
+    does_not_see: [individual_private_reflections]
+    special: "Aggregate observer role — for metric computation only."
+
+turn_dynamics:
+  mode: individual_temporal_journey
+  description: >
+    Each agent runs N simulated_days sequentially. All agents run in parallel
+    (batch), but within each agent, days are sequential — day 2 depends on
+    day 1's experience.
+
+  phases:
+    - phase: onboarding_day_1
+      rounds: 1
+      actor: all_agents_parallel
+      channel: [day_usage_journal, feature_reaction]
+      timing: "simulated day 1"
+      description: "First interaction. Onboarding flow. Initial impressions."
+
+    - phase: exploration_days_2_to_mid
+      rounds: {min: 2, default: 3, max: 4}  # representa days 2-3 o 2-4
+      actor: all_agents_parallel
+      channel: [day_usage_journal, feature_reaction, support_ticket_during_use]
+      timing: "simulated days 2-3 or 2-4"
+      description: "Exploring features. Hitting friction. Forming habits or churning early."
+
+    - phase: deep_use_or_abandon
+      rounds: {min: 2, default: 3, max: 4}
+      actor: active_agents_parallel
+      channel: [day_usage_journal, feature_reaction]
+      timing: "simulated days 4-6 or 5-7"
+      description: "Power users dig deep. Mainstream settle in. Skeptics check remaining features. Abandoners dropped from this phase."
+
+    - phase: reflection
+      rounds: 1
+      actor: all_agents_parallel (including abandoners)
+      channel: [day_7_reflection, optional_wom_share]
+      timing: "simulated day 7 or end"
+      description: "Final take. NPS score. Adoption decision."
+
+propagation_rules:
+  - id: no_cross_agent_influence
+    rule: "This venue is individual. Agents do not influence each other. If cross-pollination desired, combine with social_viral or retail_decision."
+
+  - id: day_dependency
+    rule: "Day N's experience depends on day N-1's. If user hit frustration day 3, day 4 reflects that carryover."
+
+  - id: abandon_modeling
+    rule: "If user hits critical frustration early, they may abandon. Venue respects this — doesn't force continued use."
+
+  - id: power_user_trajectory_divergence
+    rule: "Power users discover advanced features later in journey. Mainstream users stay in surface features. Skeptics probe edge cases."
+
+special_behaviors:
+  - name: killer_feature_identification
+    description: "Features with highest positive feature_reaction distribution. What made the product click?"
+
+  - name: friction_cut_recommendations
+    description: "Features with highest negative feature_reaction. Candidates for simplification or removal."
+
+  - name: adoption_velocity_estimate
+    description: "% agents still active by day N. Modeled adoption curve."
+
+  - name: nps_estimate
+    description: "Distribution of NPS scores. Segment-level breakdown."
+
+  - name: use_case_fit_per_segment
+    description: "Which user segment gets most value? Which drops off?"
+
+  - name: must_have_vs_nice_to_have
+    description: "From day_7_reflection: features that if removed would cause churn vs features users could live without."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - user_segmentation_matches_product  # early_adopter / mainstream / power / skeptic proportions sensible
+    - persona_use_case_alignment  # each persona has plausible use case for the product
+
+  post_stage_4:
+    - persona_coherence
+    - day_temporal_consistency  # day 3 references day 1 and 2 actually happened
+    - feature_reactions_structured_correctly
+    - no_collective_reasoning  # agent doesn't cite what others think
+    - abandon_rate_realistic  # not everyone powers through friction
+
+  post_stage_7:
+    - killer_feature_evidence_based
+    - friction_cut_recommendations_specific
+    - nps_distribution_honest  # not artificially inflated
+
+stimulus_delivery:
+  format: product_spec_plus_onboarding_flow_plus_feature_catalog
+  round: 1
+  content_template: >
+    "Round 1 — each agent receives: product_description, onboarding flow
+     (screenshots/script), feature set, pricing tier they have, simulated
+     starting context (their role/need that brought them here)."
+
+metrics_surfaced:
+  primary:
+    - adoption_velocity_estimate
+    - feature_delight_vs_frustration_per_feature
+    - nps_estimate_and_distribution
+    - use_case_fit_per_segment
+    - must_have_vs_nice_to_have_ranking
+
+  secondary:
+    - abandon_rate_per_segment
+    - friction_points_hotspot
+    - power_user_feature_discovery_rate
+    - support_ticket_generation_rate
+
+  outputs_unique:
+    - killer_feature_identification
+    - feature_cut_recommendations
+    - positioning_refinement_hints
+
+limits_of_venue:
+  - "Simulated usage ≠ real usage. Gap depends on product category."
+  - "Social context of use (team adoption, viral discovery) not captured here"
+  - "Time horizon limited to simulated week. Long-term retention extrapolated."
+  - "Competitive alternatives user might try not modeled within venue"
+  - "Learning curve dynamics simplified"

@@ -283,20 +283,20 @@ Ver sección 2 para DNS routing.
 
 ---
 
-## 8. Open questions para cerrar con Julian
+## 8. Decisiones resueltas (2026-04-23)
 
-1. **Prefijo `/report/` vs `/{project_id}` sin prefijo**: mi recomendación es `/report/`. ¿OK?
+1. **Prefijo `/report/{project_id}`** para deliverables. Evita colisión con rutas futuras de la landing.
 
-2. **Control panel — re-deploy del código Vue existente en `/MiroFish/frontend/`** (que está offline) vs **rewrite desde cero en React/Svelte**: recomiendo reuse del código Vue actual. Rewrite es 1-2 semanas extra sin ganancia visible.
+2. **Control panel: reuse del Vue existente** (`/Users/juliantabacman/MiroFish/frontend/`). Re-deploy en Vercel apuntando `control.sharpzanalytics.com`.
 
-3. **Stripe integration**: ¿ya está integrada en el intake actual, o hay que agregarla? El doc del intake no la menciona explícitamente.
+3. **Stripe NO se integra en v0.** Payments manuales por ahora (invoice por email post-operator approval). Re-evaluar en v1 cuando tengamos 5+ clientes recurrentes.
 
-4. **Auth flow del intake — login antes o después del form?** Mirando el código Vue, parece que no hay login pre-form (el intake_id basta). ¿Validamos email via magic-link al submittear o dejamos open submission + approval manual del operador?
+4. **Auth intake: open submission + operator approval manual.** Consistente con payments manuales. El intake form queda público (con rate limit + captcha en v0.5). El operator revisa y aprueba antes de disparar pipeline.
 
-5. **Deliverable sharing — signed URLs vs public link**: mi recomendación signed URLs. ¿El cliente pide alguna vez un link público?
+5. **Deliverable sharing: signed URLs con JWT + expiración 90 días.** Nunca public. Cliente puede generar links adicionales con scope limitado para su equipo.
 
-6. **Branding per cliente en deliverable**: el doc menciona `client_logo_url` y `client_primary_color` en el payload. ¿Confirmamos que el deliverable template usa esto o quitamos del schema?
+6. **Branding per cliente activo.** El deliverable template consume `client_logo_url` + `client_primary_color` del intake payload. Default si ausente: logo Sharpz + accent `#e0e0e0`.
 
 ---
 
-**Fin v0.1.** Siguiente paso después de resolver open questions: setup de Hostinger DNS + Netlify deploy + estructura concreta de `frontends/` con código importado.
+**Fin v0.2.** Siguiente paso: setup de Hostinger DNS + venues catalog + 3 DNA YAMLs concretos.

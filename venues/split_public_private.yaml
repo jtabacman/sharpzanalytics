@@ -1,0 +1,340 @@
+# venue: split_public_private
+# Usado por: crisis_response
+# Setting default: hybrid_multi_channel
+
+venue: split_public_private
+version: "1.0.0"
+status: active
+
+description: >
+  Venue multi-canal simultáneo para crisis de reputación. Cuatro esferas operan
+  en paralelo: press (broadcast, coverage arc), customer support (1-on-1 privado),
+  social media (digital feed caótico), regulator engagement (formal privado).
+  Cada canal tiene tono, latency y visibility propios. El test mide cómo una
+  misma respuesta variant propaga diferente por canal y cómo se afectan entre sí
+  (ej. un support ticket mal manejado se filtra a social; un regulator query se
+  refleja en press).
+
+used_by_test_types:
+  - crisis_response
+
+setting:
+  default_category: hybrid_multi_channel
+  rationale: >
+    En una crisis real, la empresa no responde en un solo canal — responde (o se
+    le consulta) en todos al mismo tiempo. La consistency cross-channel es metric
+    crítico: si el press statement dice X y el support agent contradice, los
+    afectados lo notan y el trust se erosiona.
+
+  channels_with_subsettings:
+    press: {setting: broadcast_one_to_many, formality: high}
+    customer_support: {setting: phone_support_or_email, formality: medium}
+    social_media: {setting: digital_feed, formality: low_to_medium}
+    regulator: {setting: email_async, formality: very_high}
+    internal: {setting: email_async, formality: medium_high}
+
+channels:
+  - id: press_statement
+    description: >
+      Declaración oficial de la empresa (variant A/B/C/D del test). Broadcast público
+      absoluto. Entregada una sola vez en phase 1. Es la 'piedra fundamental' sobre
+      la que reacciona el resto.
+    visibility: all
+    length_words: {min: 100, max: 400}
+    formality: high
+    actor_types: [company]  # actor sintético derivado del brief — no LLM
+    frequency: "1 por variant test"
+
+  - id: journalist_writeup
+    description: >
+      Artículo o nota de un journalist del panel (media_outlet). Incluye su framing,
+      quotes, context histórico. Tiene 24-72h typical arc: la primera writeup crea
+      el narrative que otras outlets siguen o contestan.
+    visibility: all
+    length_words: {min: 200, max: 600}
+    formality: high
+    actor_types: [media_outlet, journalist]
+    frequency: "2-5 por variant depending on story legs"
+
+  - id: public_social_reaction
+    description: >
+      Posts en social de afectados + público general + advocacy. Feed digital con
+      cascades posibles. Corto, emocional, viral-capable. Es donde el narrative
+      gana o pierde control.
+    visibility: all
+    length_words: {min: 20, max: 150}
+    formality: low_to_medium
+    actor_types: [affected, general_public, advocacy, employee_leak]
+    frequency: "high — dozens per variant, agent-paced"
+
+  - id: support_ticket_reply
+    description: >
+      Customer support 1-on-1. Un afectado abre ticket (queja, reembolso request,
+      emotional discharge); un support agent (sintético) responde. Privado entre
+      ambos. Tono puede ser formulaic corporate o human depending on variant.
+    visibility: customer_and_support
+    length_words: {min: 50, max: 250}
+    formality: medium
+    actor_types: [affected, customer_support_rep]
+    frequency: "per affected that chooses support path (30-60% of them)"
+
+  - id: regulator_formal_letter
+    description: >
+      Intercambio formal con un regulator. Query del regulator (information request,
+      subpoena-ish, complaint investigation) + response de la empresa. Privado
+      pero con riesgo de leak si la story escala.
+    visibility: regulator_and_company
+    length_words: {min: 200, max: 500}
+    formality: very_high
+    actor_types: [regulator]
+    frequency: "1-3 intercambios en 10 días simulados"
+
+  - id: advocacy_press_release
+    description: >
+      ONG / advocacy group / activist coalition publica comunicado (propio press
+      release). Usualmente contra-framing al company statement. Públicamente
+      visible, prensa lo puede amplificar.
+    visibility: all
+    length_words: {min: 200, max: 500}
+    formality: medium_high
+    actor_types: [advocacy]
+    frequency: "1-2 per variant (typically 1 main + optional follow-up)"
+
+  - id: competitor_positioning
+    description: >
+      Movida comunicacional de un competitor tomando ventaja de la crisis.
+      Típicamente CUIDADO (no se tiran directo sobre el rival caído — riesgo
+      de blowback), con statement indirecto o subtle promo. Frecuencia baja
+      y capped.
+    visibility: all
+    length_words: {min: 50, max: 200}
+    formality: medium
+    actor_types: [competitor]
+    frequency_cap: low  # max 1-2 acciones per competitor en toda la sim
+
+  - id: internal_leak
+    description: >
+      Un employee (whistleblower o frustrated leak) filtra info interna — puede ser
+      memo interno, Slack screenshots, email chain. Cambia el curso de la sim
+      cuando sucede. Raro pero impactful.
+    visibility: all (via_press_amplification)
+    length_words: {min: 100, max: 300}
+    formality: low
+    actor_types: [employee_leak]
+    frequency_cap: rare  # max 0-1 per variant
+
+visibility_matrix:
+  affected:
+    sees:
+      - press_statement
+      - journalist_writeup
+      - public_social_reaction
+      - own_support_ticket_thread
+      - advocacy_press_release
+      - competitor_positioning
+      - internal_leak (once public via press)
+    does_not_see:
+      - other_affected_support_tickets
+      - regulator_formal_letter (unless leaked)
+      - employee_internal_pre_leak
+
+  regulator:
+    sees:
+      - press_statement
+      - journalist_writeup
+      - own_formal_letter_exchange
+      - advocacy_press_release (as signal)
+    does_not_see:
+      - individual_support_tickets
+      - internal_company_memos
+
+  competitor:
+    sees:
+      - press_statement
+      - journalist_writeup
+      - public_social_reaction
+      - advocacy_press_release
+      - own_positioning_output
+    does_not_see:
+      - regulator_exchanges
+      - internal_leaks_pre_public
+      - support_tickets
+
+  journalist / media_outlet:
+    sees:
+      - press_statement
+      - public_social_reaction
+      - advocacy_press_release
+      - own_writeup_and_peer_writeups
+      - internal_leak (if leaked; picks up story)
+    special: "journalists AMPLIFY. Un leak que ven se convierte en writeup."
+
+  advocacy:
+    sees: [press_statement, journalist_writeup, public_social_reaction, own_releases]
+    special: "Aggregates signals from affected + public_social → issues targeted counter-framing"
+
+  employee_leak:
+    special: "Actor raro con special trigger — solo acciona si ciertas conditions (ej. variant_type=denial + high_backlash_detected)."
+
+turn_dynamics:
+  mode: event_driven_with_cascades
+  description: >
+    Este venue NO es round-by-round uniforme. Es event-driven: la press_statement
+    de la empresa dispara una wave de reacciones, que a su vez puede disparar
+    writeups, que pueden disparar advocacy releases, etc. El venue modela
+    cascades con decaimiento temporal.
+
+  phases:
+    - phase: stimulus_delivery
+      rounds: 1
+      actor: company
+      channel: press_statement
+      timing: "hour 0 — la empresa emite su statement (variant)"
+
+    - phase: first_48h_reactive
+      rounds: {min: 8, default: 10, max: 12}
+      actor: all_reactive
+      channel: [public_social_reaction, journalist_writeup, support_ticket_reply, advocacy_press_release]
+      timing: "6h per round simulated → 48-72h coverage"
+      description: >
+        Los afectados reaccionan en social, abren support tickets, journalists
+        escriben first writeups, advocacy acts. Cascades son posibles: un post
+        viral de un afectado disparará más reacciones.
+
+    - phase: coverage_arc
+      rounds: {min: 8, default: 12, max: 15}
+      actor: [media_outlet, public_social]
+      channel: [journalist_writeup, public_social_reaction]
+      timing: "24h per round simulated → 10 días coverage"
+      description: >
+        La story tiene legs o muere. Si gana tracción, journalists siguen cubriendo,
+        advocacy publica follow-ups, competitor puede dar mini-statement oportuno.
+
+    - phase: regulator_escalation
+      rounds: {min: 1, default: 2, max: 4}
+      actor: regulator
+      channel: regulator_formal_letter
+      timing: "paralelo a coverage_arc, usualmente days 3-14"
+      description: >
+        Si la crisis activa investigation potential, el regulator manda query
+        formal. Response de la empresa inicia otra wave. Si el regulator escala
+        (subpoena, fine hint), cambia materialmente el outlook.
+
+    - phase: settlement_or_decay
+      rounds: {min: 3, default: 5, max: 7}
+      actor: company_and_affected
+      channel: [press_statement_followup, support_ticket_reply, advocacy_press_release]
+      timing: "days 7-14"
+      description: >
+        Resolución: o bien settlement visible (compensation fund, restitution,
+        policy change), o decay natural (story out of news cycle). Los afectados
+        evalúan si trust se recupera."
+
+propagation_rules:
+  - id: press_amplifies_social
+    rule: "Un journalist writeup puede quotear public_social_reaction. Si lo hace, ese post original gana visibility adicional."
+
+  - id: internal_leak_visibility_transition
+    rule: "Un internal_leak es invisible hasta que un journalist lo picks up. Una vez picked up, se vuelve visible para todos vía press_amplification."
+
+  - id: regulator_signal_to_press
+    rule: "Si un regulator query es formal enough (investigation, subpoena), press puede enterarse y amplificar — aunque el content exacto queda privado."
+
+  - id: advocacy_vs_company_narrative_war
+    rule: "El advocacy_press_release propone contra-framing. El journalist decide qué narrative amplifica. El test mide qué narrative gana (narrative_control_score)."
+
+  - id: support_quality_leaks_to_social
+    rule: "Si un support_ticket_reply es formulaic/rude, hay chance (5-15%) que el afectado haga public_social_reaction con screenshot — cascadea al feed público."
+
+  - id: competitor_restraint
+    rule: "Competitor actions están capped (frequency_cap: low). Demasiada agresión activa counter-backlash. El venue enforces restraint natural."
+
+  - id: employee_leak_trigger_conditions
+    rule: >
+      employee_leak tiene solo 0-10% de probabilidad base. Solo se dispara si:
+      (a) variant_type involves denial o deflection AND (b) first_48h_reactive
+      produjo high_backlash (> 40% negative sentiment). Contextual.
+
+special_behaviors:
+  - name: simulated_press_coverage_arc
+    description: >
+      El venue produce un timeline 10-day reconstruido de press coverage. Útil
+      para el reporte — cliente ve 'día 1: 4 outlets cubren neutro; día 3:
+      advocacy publica y tono gira; día 7: segunda wave con regulator angle'.
+
+  - name: boycott_risk_detection
+    description: "Un threshold de públic_social negativity (>50%) + advocacy_press_release + amplification en journalist_writeups → boycott_risk metric sube."
+
+  - name: regulator_action_probability
+    description: "Combinación de regulator_formal_letter tone + affected_harm severity + media amplification → P(regulator action) 0-1 per variant."
+
+  - name: class_action_trigger
+    description: >
+      Un class_action_law_firm (en ecosystem_spec) puede entrar en la sim si
+      affected count es alto y harm severe. Este es un forecast output, no un
+      channel activo.
+
+  - name: silence_option_legitimate
+    description: >
+      Crisis_response TEST explicitly admits 'silence' como variant option. El venue
+      la modela: si company no emite statement (variant=silence), los demás
+      actores igual actúan (press demanda response, social speculate, advocacy
+      acusa de ocultamiento). El test mide si silence gana o pierde trust.
+
+qa_hints_per_stage:
+  post_stage_2:
+    - regulator_jurisdiction_match  # el regulator del panel tiene autoridad sobre la empresa?
+    - media_outlet_relevance  # los outlets cubren esta industry/geo?
+    - advocacy_alignment  # los advocacy groups tienen causa relacionada?
+    - competitor_real_competitor  # no "Adecoagro" si el subject es tech SaaS
+
+  post_stage_4:
+    - persona_coherence
+    - channel_formality_match  # regulator en very_high; social low — si se invierte, flag
+    - competitor_coherence  # competitor NO debe apoyar al affected subject
+    - affected_party_coherence  # afectado con daño real no debe sonar neutral
+    - cascade_plausibility  # story que "muere" en 24h vs que tiene legs — debe tener rationale in-world
+    - temporal_realism  # response de la empresa dentro de timing creíble
+    - no_support_ticket_leaks_without_trigger  # solo si quality es realmente mala
+    - regulator_formality_preserved  # lenguaje institucional, no casual
+    - employee_leak_conditional  # leak solo si conditions match; gratuitous leak es bug
+
+  post_stage_6:
+    - coverage_arc_plausibility  # el arc es internally consistent?
+    - no_double_counting_cascades  # no inflar viral count por duplicates
+
+  post_stage_7:
+    - silence_option_considered  # el reporte evalúa "no response" como legitimate option?
+    - narrative_control_score_calibrated
+    - boycott_risk_not_overstated_or_dismissed
+
+stimulus_delivery:
+  format: crisis_summary_plus_response_variants
+  round: 1
+  content_template: >
+    "Round 1 — crisis context: {crisis_summary}. Timeline: {events}. Affected
+     parties: {description}. Company response (this variant): {variant_statement}."
+  panel_sees: crisis_summary_global + company_response_variant_specific
+
+metrics_surfaced:
+  primary:
+    - trust_restoration_pct_by_segment
+    - escalation_risk_boycott
+    - escalation_risk_class_action
+    - escalation_risk_regulator_action
+    - narrative_control_score
+
+  secondary:
+    - employee_internal_sentiment
+    - competitor_opportunistic_moves
+    - simulated_press_coverage_arc_10d
+    - affected_satisfaction_post_support
+    - advocacy_influence_peak
+
+limits_of_venue:
+  - "No modela tail risks de celebrities high-profile con impacto desproporcionado"
+  - "Regulators reales tienen info no-pública no accesible al panel"
+  - "Crisis dynamics en vivo (new info hour-by-hour) — el venue es snapshot, no stream"
+  - "Asume ejecución correcta de la response — no modela fallas operativas"
+  - "Regional/cultural variations pueden requerir test per región"
+  - "No capta leader personal credibility (ej. CEO apology face-to-face)"

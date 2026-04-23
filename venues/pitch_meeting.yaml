@@ -1,0 +1,222 @@
+# venue: pitch_meeting
+# Usado por: investor_pitch
+# Setting default: in_person_meeting
+
+venue: pitch_meeting
+version: "1.0.0"
+status: active
+
+description: >
+  Reunión profesional presencial (o video-conferencia hi-fi en variante remota) donde
+  un GP presenta un deck de inversión a un IC de un LP institucional. 3-5 personas
+  del lado LP, 1-2 del lado GP. Duración 60-90 min. Post-meeting: IC memos internos
+  circulados dentro del LP, follow-up privado GP ↔ LP por email/DM. Cero contenido
+  público — toda la deliberación es confidencial.
+
+used_by_test_types:
+  - investor_pitch
+
+setting:
+  default_category: in_person_meeting
+  rationale: >
+    Los LPs institucionales evalúan pitches en reuniones formales, no en feeds públicos.
+    La decisión de "follow-up yes/no" se toma internamente (IC memo) con peso de varios
+    stakeholders del LP. Los DMs privados al GP son el canal natural para follow-ups.
+  remote_variant_allowed: true  # Zoom/Meet con video — mantiene dinámica análoga
+
+channels:
+  - id: dd_question
+    description: >
+      Due-diligence question formulada por un LP miembro del IC durante la sesión Q&A.
+      Público intra-reunión (todos los asistentes la escuchan).
+    visibility: all_attendees
+    length_words: {min: 20, max: 150}
+    formality: high
+    actor_types: [lp_primary]
+    frequency: "4-6 rounds después de pitch_delivery"
+    examples:
+      - "¿Cuál es su experiencia operativa directa en agri Argentino? No VC, hands-on."
+      - "Si los márgenes caen 300bps en año 3, ¿cómo protege la TIR objetivo?"
+
+  - id: ic_memo_internal
+    description: >
+      Memo formal circulado dentro del LP post-meeting. Sintetiza la posición del IC
+      miembro sobre el deal. Tono institutional, 1-2 párrafos. Inputa a la decisión
+      colectiva del IC.
+    visibility: own_lp_firm_only
+    length_words: {min: 100, max: 400}
+    formality: very_high
+    actor_types: [lp_primary]
+    frequency: "1 por LP post meeting, en phase post_meeting_internal"
+    examples:
+      - "IC Memo — Invernea Fund III. Recommendation: proceed to second meeting with caveats..."
+
+  - id: dm_to_gp
+    description: >
+      Mensaje privado del LP al GP con follow-up específico. Puede ser pedido de info
+      adicional ("mandame el track record desagregado por vintage"), pregunta que no
+      quiso hacer frente al IC, o signal soft de interés.
+    visibility: sender_and_gp_only
+    length_words: {min: 15, max: 80}
+    formality: medium
+    actor_types: [lp_primary]
+    frequency: "5-10 DMs total distribuidos entre top LPs activos"
+    examples:
+      - "Gracias por el pitch. ¿Podés mandarme el tear-sheet del Fund II sin redactar?"
+
+  - id: peer_dm_crosslp
+    description: >
+      DM privado entre LPs sobre el pitch recibido. Sucede poco — los LPs generalmente
+      NO cotillean sobre deals confidenciales — pero puede darse cuando hay red previa
+      (ex-colegas, program alumni). Cuando ocurre, el signal es alto.
+    visibility: dyadic_between_lps
+    length_words: {min: 15, max: 80}
+    formality: medium_low
+    actor_types: [lp_primary]
+    frequency_cap: rare  # max 2-3 interacciones en toda la sim
+    examples:
+      - "Vos viste el pitch de [fondo]? Me pareció floja la slide de risk — ¿tu IC qué dijo?"
+
+  - id: ecosystem_reaction
+    description: >
+      Reacción de un ecosystem actor (law firm, trade press, comparable) invitado al
+      meeting o consultado sobre el deck. Baja frecuencia — típicamente 1 por test.
+    visibility: limited_by_role
+    length_words: {min: 30, max: 200}
+    formality: high
+    actor_types: [law_firm, media_trade, regulator]
+    frequency: "1-3 contribuciones en toda la sim"
+
+visibility_matrix:
+  gp:
+    sees: [dd_question, dm_to_gp, ecosystem_reaction]
+    does_not_see: [ic_memo_internal, peer_dm_crosslp]
+    rationale: "El GP ve las preguntas directas y recibe DMs, pero no accede a memos internos de los LPs."
+
+  lp_primary:
+    sees:
+      - dd_question
+      - own_ic_memo
+      - own_firm_peer_ic_memos
+      - dms_involved_as_sender_or_recipient
+      - peer_dms_involved
+    does_not_see:
+      - other_lps_ic_memos
+      - dms_between_gp_and_other_lps
+    rationale: "Un LP ve todo lo de su propia firma + lo público, pero nunca material interno de otros LPs."
+
+  ecosystem_law_firm:
+    sees: [dd_question, ecosystem_reaction]
+    does_not_see: [ic_memo_internal, dm_to_gp, peer_dm_crosslp]
+
+  ecosystem_media_trade:
+    sees: [dd_question, ecosystem_reaction, dm_to_gp_if_leaked]
+    does_not_see: [ic_memo_internal]
+
+turn_dynamics:
+  mode: structured_then_async
+  phases:
+    - phase: pitch_delivery
+      rounds: 1
+      actor: gp
+      channel: stimulus_delivery
+      timing: "simulated 15-20 min of presentation"
+      description: "GP presenta el deck. Esto es round 1, un solo 'actor' (GP) y una sola acción."
+
+    - phase: live_qa
+      rounds: {min: 4, default: 5, max: 6}
+      actor: lp_primary
+      actor_selection: "weighted rotation by engagement_probability per LP persona"
+      channel: dd_question
+      timing: "simulated 20-30 min de Q&A"
+      description: "Los LPs preguntan en turnos. Cada round un LP pregunta. El GP responde conceptualmente basado en el brief (en v0 el GP NO es un LLM agent — responde deterministic desde brief)."
+
+    - phase: post_meeting_internal
+      rounds: {min: 3, default: 4, max: 5}
+      actor: lp_primary
+      actor_selection: "all_lps_in_parallel"
+      channel: ic_memo_internal
+      timing: "simulated 24-72h post meeting"
+      description: "Cada LP escribe su IC memo. Paralelo — todos los LPs lo hacen al mismo tiempo conceptualmente."
+
+    - phase: followup_private
+      rounds: {min: 5, default: 7, max: 10}
+      actor: lp_primary
+      actor_selection: "subset_top_engaged"
+      channel: dm_to_gp
+      timing: "simulated 3-14 days post meeting"
+      description: "LPs con interés mandan DMs de follow-up al GP. Algunos hacen peer_dm_crosslp (poco)."
+
+    - phase: ecosystem_chatter
+      rounds: {min: 0, default: 1, max: 3}
+      actor: [law_firm, media_trade]
+      channel: ecosystem_reaction
+      timing: "paralelo a followup_private"
+      description: "Ecosystem actors pueden hacer contribuciones relevantes. Opcional."
+
+propagation_rules:
+  - id: no_public_channel
+    rule: "Ningún mensaje en este venue se propaga a feeds públicos. El pitch es confidencial."
+
+  - id: dd_question_response
+    rule: "GP responds conceptualmente desde brief (no LLM para GP en v0). Si el brief no cubre la pregunta, el response es 'se tomará nota para follow-up'."
+
+  - id: cross_lp_influence_low
+    rule: "Los LPs evalúan el deal predominantemente independientes. La influencia cross-LP es vía peer_dm_crosslp que tiene frequency_cap: rare."
+
+  - id: info_leakage_none
+    rule: "IC memos NO se filtran fuera del LP. Si el modelo intenta que otro LP 'comente sobre memo interno de otro', QA flagea como hallucination."
+
+  - id: ecosystem_consultation_asymmetric
+    rule: "Un LP puede 'consultar' a un law firm sobre aspectos del deck (regulatory, legal, structural). El law firm NO ve el deck completo — solo la parte relevante."
+
+special_behaviors:
+  - name: check_size_negotiation
+    description: "Durante live_qa y followup_private, el LP puede flotar un check_size range. Esto es signal primario. Se trackea como metric."
+
+  - name: term_sheet_hint
+    description: "Un LP con alta intent manda DM con 'would appreciate a draft term sheet to share with IC'. Señal más fuerte que el IC memo favorable."
+
+  - name: red_flag_ranking
+    description: "Cada LP que sube un red flag en dd_question o ic_memo acumula; el test aggreg su frecuencia + severidad para el ranking final del reporte."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - law_firm_plausibility  # ¿el law firm extraído del deck cubre la jurisdicción del deal?
+    - geographic_specificity  # LPs con geographic mandate deben coincidir con el deal geo
+    - check_size_range_sanity  # LPs con ticket size demasiado chico o demasiado grande vs el raise
+
+  post_stage_4:
+    - dd_question_depth  # ¿las DD questions son institucionales o parecen retail?
+    - ic_memo_institutional_tone  # ¿el memo suena como IC real o como Reddit post?
+    - no_public_leakage  # ¿nadie "tuiteó" o comentó públicamente sobre el pitch?
+    - gp_response_consistency  # ¿las respuestas del GP contradicen el brief?
+    - competitor_coherence  # comparables NO deben "apoyar" al fund raising
+
+  post_stage_7:
+    - lp_named_variety  # ¿el reporte cita LPs variados o se concentra en 1-2?
+    - dd_quote_authenticity  # quotes citadas deben matchear la sim literal
+
+stimulus_delivery:
+  format: gp_presents_deck
+  round: 1
+  content_template: >
+    "Round 1 — pitch meeting starts. GP presenta Fund [X]. Thesis: {one_paragraph}.
+     Track record: {summary}. Target raise: {amount} USD. Fund size target: {size}.
+     Slides cubren: {slide_titles_list}."
+  panel_sees: full_deck_pdf_rendered_as_text_plus_vision_extracted_tables
+
+metrics_surfaced:
+  primary:
+    - dd_question_count_per_lp
+    - dd_question_depth_score  # LLM rates 1-10 how institutional the Q is
+    - ic_memo_stance  # negative / mixed / positive / enthusiastic
+    - follow_up_dm_sent  # boolean per LP
+    - check_size_floated
+    - term_sheet_requested
+
+limits_of_venue:
+  - "No captura chemistry del GP en vivo (tono de voz, body language, storytelling)"
+  - "GP no reacciona en tiempo real a objecciones — responde desde brief"
+  - "No modela cross-deal competition (otro fondo raising al mismo tiempo)"
+  - "IC deliberation colectiva simplified — cada LP persona es un IC composite"

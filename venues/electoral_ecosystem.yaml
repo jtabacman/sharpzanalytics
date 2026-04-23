@@ -1,0 +1,366 @@
+# venue: electoral_ecosystem
+# Usado por: electoral_sentiment
+# Setting default: hybrid_multi_channel (polls + family dinners + WhatsApp + rallies + debates + news)
+
+venue: electoral_ecosystem
+version: "1.0.0"
+status: active
+
+description: >
+  Multi-surface simulation del decision-making votante. Captura los canales
+  reales por donde un votante forma opinión y moviliza: polls (aggregated
+  external signals), family dinner conversations (closed high-trust), WhatsApp
+  groups (semi-private tribal), rallies (emotional public), debates
+  (performance-driven), news consumption (framing driver). Incluye segmentation
+  crítica: base / opposition / persuadable / non-voter / single-issue.
+
+used_by_test_types:
+  - electoral_sentiment
+
+setting:
+  default_category: hybrid_multi_channel
+  subsettings_per_channel:
+    polls: {category: broadcast_one_to_many, formality: high}
+    family_dinner: {category: in_person_private, formality: low}
+    whatsapp_group: {category: messaging_private, formality: low}
+    rally: {category: in_person_panel, formality: medium}
+    debate: {category: broadcast_one_to_many, formality: very_high}
+    news_consumption: {category: digital_feed, formality: medium}
+  rationale: >
+    Voter decisions no se forman en 1 canal. El votante modal recibe signals
+    de news + conversations con family + group chats tribales, y pocos de
+    ellos asisten a rallies o ven debates completos. Modelar el ecosystem
+    completo captura cómo la campaign message se filtra y se deforma.
+
+channels:
+  - id: campaign_message_broadcast
+    description: >
+      Mensaje de la campaña emitido públicamente — speech, rally clip, ad TV,
+      social post oficial. Variant del test. Broadcast al ecosystem completo
+      pero con reach diferencial (no todos ven).
+    visibility: all (with reach_weighting)
+    length_words: {min: 50, max: 300}
+    formality: medium_high
+    actor_types: [campaign_official]
+    frequency: "1 por variant en phase 1"
+
+  - id: poll_result_released
+    description: >
+      Poll publicado por media outlet. Incluye margin + sample. Afecta
+      momentum perception + strategic voting considerations. Not generated
+      per agent — es aggregate external signal.
+    visibility: all (via news)
+    length_words: {min: 30, max: 150}
+    formality: high
+    actor_types: [polling_institute, media_outlet]
+    frequency: "1-2 polls per variant en la sim"
+
+  - id: debate_clip
+    description: >
+      Clip específico de debate (30-90 seconds). Incluye candidate quote,
+      opponent response, moderator framing. Amplifica via news y social
+      commentary.
+    visibility: all (via news_consumption)
+    length_words: {min: 50, max: 200}
+    formality: very_high
+    actor_types: [candidate, debate_moderator]
+    frequency: "1-3 clips por variant si debate happens"
+
+  - id: family_dinner_talk
+    description: >
+      Conversación privada en family/close friends setting. Voice intimate,
+      candid opinions. Dos-tres agents típico. Una de las capas más influyentes
+      en cambio de opinión — family carries weight que media no.
+    visibility: dyadic_or_small_group_same_family
+    length_words: {min: 30, max: 200}
+    formality: low
+    actor_types: [all_voter_segments]
+    frequency: "20-30 conversations distribuidas"
+
+  - id: whatsapp_group_message
+    description: >
+      Mensaje en WhatsApp group (friends, neighbors, coworkers, church group).
+      Semi-public tribal — todos en el group son del mismo circle social.
+      Gran vehículo de misinformation + tribal reinforcement.
+    visibility: whatsapp_group_members
+    length_words: {min: 15, max: 150}
+    formality: low
+    actor_types: [all_voter_segments, amplifier]
+    frequency: "high — 40-80 messages distribuidos"
+
+  - id: rally_chant_or_reaction
+    description: >
+      Reacción de un asistente a rally: cheer, chant, post-rally statement
+      a peer. Emotional, non-cognitive driver. Solo un subset del panel asiste.
+    visibility: rally_attendees + public_via_clips
+    length_words: {min: 10, max: 80}
+    formality: medium
+    actor_types: [base_supporter, persuadable_attending]
+    frequency: "5-10 reactions per rally event"
+
+  - id: news_consumption_reaction
+    description: >
+      Agent reads/watches news piece y expresa take. Puede ser to self
+      (internal monologue), family dinner, o WhatsApp. Filtering + selective
+      exposure capturados en which outlets each segment consumes.
+    visibility: depends on propagation channel
+    length_words: {min: 20, max: 120}
+    formality: low_to_medium
+    actor_types: [all_voter_segments]
+    frequency: "high"
+
+  - id: candidate_dm_campaign
+    description: >
+      Text message / email / DM dirigido del campaign al votante específico.
+      Parte de mobilization effort. Individual, targeted. Measurable directly
+      (read/not, respond/not).
+    visibility: campaign_and_recipient
+    length_words: {min: 20, max: 80}
+    formality: medium
+    actor_types: [campaign_official]
+    frequency: "subset — campaign_targeting based on segmentation"
+
+  - id: opposition_counter_message
+    description: >
+      Respuesta del opponent camp al campaign message. Counter-framing, attack,
+      factcheck. Broadcast via opposition_aligned_media + opposition supporters
+      amplify.
+    visibility: all (with reach bias by tribe)
+    length_words: {min: 50, max: 250}
+    formality: medium_high
+    actor_types: [opposition_campaign, opposition_aligned_media]
+    frequency: "1-2 per variant"
+
+visibility_matrix:
+  base_supporter:
+    sees:
+      - campaign_message_broadcast (high reach — follows campaign)
+      - poll_results
+      - debate_clips (high likelihood of watching)
+      - family_dinner_talk (own family)
+      - whatsapp_group_message (base-aligned groups)
+      - rally_reactions (attends rallies)
+      - news_consumption_reaction (base-aligned outlets)
+      - own_targeted_dm
+    special: "Base lives in aligned bubble — minimal exposure to opposition."
+
+  opposition_supporter:
+    sees:
+      - campaign_message_broadcast (medium reach — may block/mute)
+      - opposition_counter_message (high reach)
+      - family_dinner + whatsapp (opposition-aligned groups)
+      - news (opposition outlets)
+    special: "Mirror image of base — aligned bubble of opposite side."
+
+  persuadable:
+    sees:
+      - both_campaign_messages_partial (medium reach both sides)
+      - polls (high attention)
+      - debate_clips (higher likelihood of watching for info)
+      - family_dinner (mixed family — both sides present)
+      - whatsapp (mixed groups typical)
+      - news (consumes multiple outlets)
+    special: "Persuadables son el target del test. Ven más diversity of signals."
+
+  non_voter:
+    sees: [news_consumption_reaction (low volume), whatsapp_passive]
+    special: "Low-info voter. Exposure minimal. Mobilization efforts puede moverlo."
+
+  single_issue_voter:
+    sees:
+      - campaign_message_broadcast (parses only for own issue)
+      - family_dinner
+      - whatsapp (issue-specific groups)
+    special: "Filtra todo por UNA issue. Ignora el rest. Movement only on own_issue signal."
+
+  campaign_official:
+    sees:
+      - own_broadcast
+      - poll_results
+      - opposition_counter_message
+      - debate_clips
+    does_not_see:
+      - family_dinner_talk (private)
+      - whatsapp_group_message (private)
+      - non-subscriber_news_consumption
+
+turn_dynamics:
+  mode: campaign_cycle_with_peak_moments
+  description: >
+    Electoral cycle es NO-uniform. Hay peak moments (debate night, major rally,
+    scandal break, final week) con compressed activity. El venue modela arc
+    general + peaks.
+
+  phases:
+    - phase: campaign_message_release
+      rounds: 1
+      actor: campaign_official
+      channel: campaign_message_broadcast
+      timing: "day 0 — message debuts"
+
+    - phase: first_response_wave
+      rounds: {min: 3, default: 4, max: 6}
+      actor: [all_voter_segments, media_outlet, opposition_campaign]
+      channel: [news_consumption_reaction, whatsapp_group_message, opposition_counter_message]
+      timing: "days 1-7"
+      description: "Primeros takes. Opposition responde. News frames."
+
+    - phase: peer_deliberation_wave
+      rounds: {min: 5, default: 7, max: 10}
+      actor: [all_voter_segments]
+      channel: [family_dinner_talk, whatsapp_group_message]
+      timing: "days 7-21"
+      description: "Conversations propagan, mutate el mensaje, refinan posiciones."
+
+    - phase: peak_moment_trigger
+      rounds: {min: 1, default: 2, max: 4}
+      actor: [candidate, campaign_official, all_reactive]
+      channel: [debate_clip, rally_chant_or_reaction, campaign_dm]
+      timing: "day 15-28 (scheduled peak)"
+      description: >
+        Event activador: debate, rally, major ad drop, or scandal. Compressed
+        activity 24-72h.
+
+    - phase: poll_interpretation
+      rounds: {min: 1, default: 2, max: 3}
+      actor: [polling_institute, media_outlet, all_voter_segments]
+      channel: [poll_result_released, news_consumption_reaction, whatsapp_group_message]
+      timing: "days 10-30"
+      description: "Poll drops, everyone reads into it. Momentum narrative forms."
+
+    - phase: final_stretch_mobilization
+      rounds: {min: 3, default: 4, max: 6}
+      actor: [campaign_official, base_supporter, opposition_supporter]
+      channel: [campaign_dm, whatsapp_group_message, rally_reactions]
+      timing: "days 28-35 (last week)"
+      description: "Final push. GOTV. Base energization o apathy becomes evident."
+
+propagation_rules:
+  - id: tribal_bubble_propagation_asymmetry
+    rule: >
+      Messaging dentro de own-tribe propaga 3-5x faster (whatsapp group
+      reinforcement) que cross-tribe. Cross-tribe penetration requires either
+      (a) media_outlet picking it up, or (b) persuadable agent bridging.
+
+  - id: family_dinner_influence_weight
+    rule: >
+      Family_dinner conversation tiene higher persuasion weight than any other
+      channel. Un peer en family con strong take puede shift opinion más que
+      100 posts.
+
+  - id: whatsapp_as_misinformation_vector
+    rule: >
+      whatsapp_group_message tiene menor fact-check friction que news. El venue
+      permite (con probabilidad) narrativas que deforman facts del mensaje
+      original. Modelamos esto como natural mutation, no bug.
+
+  - id: debate_clip_viral_window
+    rule: >
+      Debate clips tienen 48-72h viral window max. Después del día 3 del debate,
+      el clip ya está 'interpreted' y movement drops.
+
+  - id: poll_momentum_effect
+    rule: >
+      Un poll favorable al candidate sube base turnout probability + moves
+      some persuadables. Un poll desfavorable deprime base turnout + activates
+      opposition.
+
+  - id: single_issue_filter_rigidity
+    rule: >
+      Single_issue voters IGNORAN todo messaging que no toca su issue. Si el
+      campaign_message no direct-addresses their issue, movement = 0 for this
+      segment.
+
+  - id: non_voter_activation_requires_emotional_trigger
+    rule: >
+      Non_voter segment moves solo si activador fuerte: rally attendance,
+      family member with strong take, single_issue match. Cognitive appeals
+      = low movement.
+
+  - id: opposition_mobilization_as_unintended_consequence
+    rule: >
+      Un mensaje que energiza tu base puede ALSO energizar la opposition base
+      (backfire effect). Venue detecta si opposition_mobilization > base_gain.
+
+special_behaviors:
+  - name: turnout_prediction_per_segment
+    description: "P(turnout) per voter segment weighted by enthusiasm + logistics. Aggregate = turnout forecast."
+
+  - name: vote_shift_per_segment
+    description: "Pre-sim baseline intent vs post-sim intent. Delta per segment."
+
+  - name: enthusiasm_gap_detection
+    description: "Base energized? Apathy detected? Measure: rally mentions, campaign_dm engagement, whatsapp_volume per segment."
+
+  - name: opposition_mobilization_risk
+    description: "¿El message activa al rival? Detect via opposition_counter_message volume + whatsapp_opposition volume."
+
+  - name: persuadable_conversion_rate
+    description: "El metric crítico del test. % de persuadable segment que shift intent towards candidate post-sim."
+
+  - name: narrative_distortion_whatsapp
+    description: "Tree de cómo el campaign_message mutated al propagate en whatsapp groups. Factchecks vs rumors detectables."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - voter_segmentation_matches_brief  # base/opposition/persuadable/non_voter/single_issue con right proportions
+    - geographic_realism  # si es electoral AR, agents en AR geography
+    - single_issue_voters_have_identifiable_issue  # NO genérico
+    - media_outlet_alignment_realistic  # outlets left/right/center correctly tagged
+
+  post_stage_4:
+    - persona_coherence
+    - tribal_alignment_consistency  # un base_supporter no elogia opposition message
+    - whatsapp_tone_casual  # no formal broadcast tone en group chat
+    - family_dinner_multi_generation_realistic  # diversity of opinions dentro de family
+    - poll_reaction_calibrated  # poll moves are proportional
+    - opposition_coherence  # opposition NO support the campaign gratuitously
+    - no_english_in_spanish_whatsapp_groups  # language drift check
+    - single_issue_filter_applied  # single_issue agents ignore non-issue messaging
+    - realistic_information_gaps  # non_voter segment has low-info takes
+
+  post_stage_6:
+    - persuadable_conversion_tracked_per_individual
+    - opposition_mobilization_measured
+
+  post_stage_7:
+    - turnout_weighted_vote_share_correct
+    - counter_messaging_predictions_present
+    - enthusiasm_gap_explicit
+
+stimulus_delivery:
+  format: campaign_message_variant_drop
+  round: 1
+  content_template: >
+    "Round 1 — campaign drops: {message_variant}. Channel: {primary_channel}
+     (rally speech / ad debut / social post). Context: {campaign_stage}
+     (primary / general / runoff). Geography: {geo}."
+  panel_sees: message_full_text_plus_visual_if_ad
+
+metrics_surfaced:
+  primary:
+    - vote_shift_per_segment_pct
+    - turnout_probability_weighted
+    - enthusiasm_gap_score
+    - opposition_mobilization_risk_score
+    - persuadable_conversion_rate_pct
+
+  secondary:
+    - message_penetration_per_channel
+    - narrative_mutation_tree_whatsapp
+    - debate_moment_impact (if applicable)
+    - poll_driven_momentum_shift
+    - single_issue_voter_response_rate
+
+  outputs_unique:
+    - turnout_weighted_vote_share_estimate
+    - message_efficacy_by_demographics_breakdown
+    - counter_messaging_predictions  # what will opposition say
+
+limits_of_venue:
+  - "Electoral outcomes depend on factors fuera del message: economy, scandals, turnout machinery"
+  - "Geographic micro-targeting (precinct level) no modelado"
+  - "Dark money / paid amplification no representado explícitamente"
+  - "Ground game (door-knocking, phone banking) approximated in campaign_dm"
+  - "Cultural touchstones muy regionales requieren calibration per mercado"
+  - "Late-breaking events (octubre sorpresa) no simulables by design"

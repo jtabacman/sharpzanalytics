@@ -1,0 +1,204 @@
+# venue: polarized_social
+# Usado por: controversial_launch
+# Setting default: digital_feed (polarized variant)
+
+venue: polarized_social
+version: "1.0.0"
+status: active
+
+description: >
+  Variante extrema de social_viral para tests donde el stimulus es deliberadamente
+  polarizador. Modela dinámicas amplificadas: backlash loops, counter-backlash,
+  boycott threads, defensive amplification, tribal mobilization. Permite NO-GO
+  legítimo si the cost outweighs benefit.
+
+used_by_test_types:
+  - controversial_launch
+
+setting:
+  default_category: digital_feed
+  amplification_profile: extreme
+  rationale: >
+    Lanzamientos controversiales activan AMBAS bases (pro + contra) simultáneamente.
+    El venue hereda de social_viral pero con propagation rules más agresivas +
+    explicit measurement de polarization dynamics.
+
+channels:
+  inherits_from: social_viral
+  additional_channels:
+    - id: boycott_thread
+      description: >
+        Thread organizing boycott o coordinating opposition. Usually initiated by
+        advocacy/activist, amplified by opposition base. Can gain tracción rapid.
+      visibility: all
+      length_words: {min: 50, max: 300}
+      formality: medium
+      actor_types: [advocacy, opposition_base, amplifier_opposition]
+      frequency: "1-3 organized boycott threads per controversy"
+
+    - id: defensive_coalition_post
+      description: >
+        Base supporters coordinating defense of the launch. 'I stand with X',
+        buy-in pledges, counter-boycott calls.
+      visibility: all
+      length_words: {min: 30, max: 200}
+      formality: medium_low
+      actor_types: [base_supporter, amplifier_base]
+      frequency: "2-4 coalition moments"
+
+    - id: celebrity_or_expert_stance
+      description: >
+        High-influence individual (celebrity, expert, public figure) takes stance.
+        Amplifies into news cycle. Risk/reward high: a celebrity endorsing can
+        flip persuadables; condemning can accelerate backlash.
+      visibility: all (high reach)
+      length_words: {min: 50, max: 250}
+      formality: medium_high
+      actor_types: [opinion_leader_high_influence]
+      frequency: "0-3 such moments per sim"
+
+visibility_matrix:
+  inherits_from: social_viral
+  base_supporter:
+    sees: [own_tribe_posts_amplified, defensive_coalition_posts, some_boycott_exposure_limited]
+
+  opposition_base:
+    sees: [own_tribe, boycott_threads, advocacy_content, amplified_criticism]
+
+  persuadable:
+    sees: [both_tribes_content_proportional, celebrity_stances, mainstream_coverage]
+    special: "THE target segment. Decides whether launch gets legitimized or becomes toxic."
+
+  amplifier (both sides):
+    sees: [all_public_content, targets of outrage]
+    special: "Amplifiers son motores del venue. Si amplifiers both-sides activan, peak polarization."
+
+turn_dynamics:
+  mode: reactive_with_amplification_spirals
+  inherits_from: social_viral
+  key_differences:
+    - "amplification_multiplier x2 vs social_viral baseline"
+    - "cross_tribe_friction_boost activates more aggressively"
+    - "backlash_cascade_windows compressed"
+
+  phases:
+    - phase: stimulus_drop
+      rounds: 1
+    - phase: tribal_alignment_immediate
+      rounds: {min: 2, default: 3, max: 4}
+      description: "Both tribes align rapidamente. Pro y contra posts wave 1."
+    - phase: amplification_spiral
+      rounds: {min: 4, default: 6, max: 8}
+      description: "Outrage amplifies from both sides. Viral cascades."
+    - phase: celebrity_expert_intervention
+      rounds: {min: 0, default: 1, max: 2}
+      description: "High-influence individuals take stance. Shifts momentum."
+    - phase: boycott_coalescence
+      rounds: {min: 1, default: 2, max: 3}
+      description: "If backlash sustains, boycott threads organize. Coordinated opposition."
+    - phase: defensive_response_or_retreat
+      rounds: {min: 1, default: 2, max: 3}
+      description: "Subject responds: double-down / apologize / silence. Massive downstream."
+    - phase: persuadable_decision_window
+      rounds: {min: 2, default: 3, max: 4}
+      description: "Persuadables see the dust settle, decide which side legitimizes."
+    - phase: entrenchment_or_decay
+      rounds: {min: 2, default: 3, max: 4}
+
+propagation_rules:
+  inherits_from: social_viral
+  additional_rules:
+    - id: outrage_asymmetry
+      rule: "Negative emotion posts travel ~2.5x further than positive. Venue calibrates realistically."
+
+    - id: backfire_persuadable_risk
+      rule: >
+        Aggressive defense from base can BACKFIRE on persuadables — they interpret
+        vehemence as evidence the concern is real. Metric: defensive_activity
+        correlated with persuadable_loss.
+
+    - id: celebrity_endorsement_double_edge
+      rule: >
+        Endorsement from polarizing celebrity hurts as much as helps. Venue tracks
+        net effect per celebrity alignment.
+
+    - id: boycott_signal_amplification
+      rule: >
+        Organized boycott thread con >100 participants threshold triggers
+        journalist_writeup flag — crosses from social to press coverage.
+
+    - id: silence_interpreted_as_admission
+      rule: >
+        If subject goes silent post-backlash, critics interpret as admission.
+        Venue captures this interpretation dynamic.
+
+special_behaviors:
+  - name: no_go_legitimate_recommendation
+    description: >
+      Este venue explicit admits NO-GO. If analysis shows net harm (persuadables
+      lost, amplification of opposition base > gain in own base), report
+      recommends NOT launching.
+
+  - name: amplification_asymmetry_measurement
+    description: "Compare amplifier_activation_rate base vs opposition. A loud minority can outshout a silent majority."
+
+  - name: tipping_point_detection
+    description: "Identify round where the narrative consolidated in one direction. Was it a specific post? A celebrity? A journalistic framing?"
+
+  - name: persuadable_final_split
+    description: "Final split of persuadables: supportive / neutral / opposed post-sim. This is the primary conversion metric."
+
+  - name: backlash_half_life
+    description: "Rounds until post-volume drops to 50% of peak. Long half-life = sustained damage. Short = news cycle moves on."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - polarized_panel_composition  # deliberately divided (30/30 base/opposition + 20/20 persuadable/amplifier)
+    - advocacy_groups_both_sides  # representation of both advocacy poles
+    - celebrity_relevance  # celebrities mentioned are actually relevant to the issue
+
+  post_stage_4:
+    - persona_coherence
+    - tribal_authenticity  # base doesn't go wobbly, opposition doesn't go soft
+    - language_drift
+    - amplification_realism  # not every post goes viral
+    - no_scripted_outrage  # variety of voices within tribe
+    - silence_as_option_modeled  # if variant is restraint/silence, doesn't artificially generate content
+
+  post_stage_7:
+    - no_go_evaluated_honestly  # don't default to optimistic
+    - persuadable_loss_quantified
+    - opposition_mobilization_surfaced
+
+stimulus_delivery:
+  format: controversial_launch_content
+  round: 1
+  content_template: >
+    "Round 1 — launch: {controversial_content}. Subject: {entity}. Known
+     polarization axis: {axis}. Expected divergence: {pro_vs_contra_baseline}."
+
+metrics_surfaced:
+  primary:
+    - net_sentiment_score  # support minus opposition weighted
+    - amplification_ratio_base_vs_opposition
+    - boycott_probability
+    - persuadable_conversion_rate
+    - dominant_narrative_post_cycle
+
+  secondary:
+    - backlash_half_life
+    - celebrity_amplification_impact
+    - counter_mobilization_severity
+    - press_crossover_signal
+    - sustained_damage_index
+
+  special_output:
+    no_go_legitimate_recommendation: true
+    silence_option_always_evaluated: true
+
+limits_of_venue:
+  - "Cultural context matters — polarization tropes are region-specific"
+  - "Pre-existing brand equity affects outcomes beyond venue scope"
+  - "Real-world regulatory intervention (FTC, EU) not modeled"
+  - "Bot amplification por actores maliciosos no representado"
+  - "Celebrity alignment politics very volatile in real time"

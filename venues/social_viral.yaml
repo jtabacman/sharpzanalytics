@@ -1,0 +1,280 @@
+# venue: social_viral
+# Usado por: campaign_planning, brand_sentiment_shift, creative_test (parcialmente)
+# Setting default: digital_feed
+
+venue: social_viral
+version: "1.0.0"
+status: active
+
+description: >
+  Feed digital tipo Twitter/X/Instagram/TikTok. Posts cortos, engagement rápido,
+  viral cascades posibles. Visibility mayormente pública (DMs privados como
+  excepción). Turn dynamics reactivos: si algo gana tracción, más agents lo ven
+  y reaccionan. El venue modela amplification nativa (retweets, shares, quote-posts)
+  + decay temporal (las cosas se enfrían).
+
+used_by_test_types:
+  - campaign_planning
+  - brand_sentiment_shift
+  - creative_test  # parcial — combined con retail_decision para pricing/product feedback
+  - narrative_framing  # parcial — combined con press_cycle
+
+setting:
+  default_category: digital_feed
+  rationale: >
+    Contextos sociales públicos son donde las campañas, brand movements y
+    creatividades ganan o pierden. Posts cortos, emoción alta, viral cascades
+    son el mecanismo natural de la reach moderna.
+  platform_variants:
+    - twitter_x: "posts cortos, quote-posts, threads, high velocity"
+    - instagram: "visual-first, comments nested, stories"
+    - tiktok: "video-native, algoritmo driven discovery"
+    - reddit: "threaded discussions, upvote mechanics, community norms"
+
+channels:
+  - id: post_public
+    description: >
+      Post público en el feed del agent. Puede ser reacción al stimulus,
+      comentario independiente, o parte de un thread. Todos lo ven.
+    visibility: all (weighted by agent reach)
+    length_words: {min: 10, max: 80}
+    formality: low
+    actor_types: [consumer, opinion_leader, critic, amplifier, brand_loyalist]
+    frequency: "high — multiple per agent per round"
+
+  - id: quote_post
+    description: >
+      Amplification con commentary. Un agent quotea el post de otro y agrega su
+      take. Mechanism central de virality y narrative mutation.
+    visibility: all
+    length_words: {min: 10, max: 100}
+    formality: low
+    actor_types: [all, weighted amplifier]
+    frequency: "20-40% of engagement se hace vía quote_post"
+
+  - id: reply_threaded
+    description: >
+      Respuesta en thread a un post existente. Puede disputar, agregar, endorsar.
+      Más intimate que quote_post — suele ser entre agents que se conocen.
+    visibility: all (quien vea el thread)
+    length_words: {min: 10, max: 80}
+    formality: low_to_medium
+    actor_types: [all]
+    frequency: "high en threads activos"
+
+  - id: like_share_signal
+    description: >
+      Señal numérica de engagement (like, share, boost). No genera content, pero
+      señala traction. Los agents ven el count y eso afecta si interactúan.
+    visibility: aggregate_count_visible
+    length_words: 0  # solo signal numérica
+    actor_types: [all]
+    frequency: "very high — background signal"
+
+  - id: dm_private
+    description: >
+      Mensaje directo privado entre dos agents. Más raw, sin pulido para public.
+      Puede ser acuerdo, disenso, o conspiracy con peers.
+    visibility: dyadic_private
+    length_words: {min: 15, max: 100}
+    formality: low
+    actor_types: [all]
+    frequency: "low — 10-20% of agents use DMs"
+
+  - id: story_ephemeral
+    description: >
+      Post short-lived (24h) en Stories. Menos weight en narrative pero alto
+      en reach inmediato. Útil para reactions primarias.
+    visibility: all (24h window)
+    length_words: {min: 5, max: 40}
+    formality: low
+    actor_types: [consumer, opinion_leader, amplifier]
+    frequency: "medium"
+
+  - id: expert_thread_longform
+    description: >
+      Un opinion_leader publica un thread largo analizando en profundidad.
+      Autoridad alta, amplification via quote_posts y shares. Típicamente 1 por
+      opinion_leader relevante.
+    visibility: all
+    length_words: {min: 200, max: 800}  # thread = multiple posts
+    formality: medium_high
+    actor_types: [opinion_leader]
+    frequency: "1-2 per opinion_leader en la sim"
+
+visibility_matrix:
+  note: "La visibility en social_viral es mayormente 'all', pero modelada con reach weighting — no todos los agents ven todo. El algoritmo decide."
+
+  all_agents:
+    sees:
+      - post_public (with reach_prob)
+      - quote_post (with reach_prob, higher if quoted by hub)
+      - reply_threaded (if see the parent)
+      - like_share_signal (aggregate)
+      - story_ephemeral (24h window)
+      - expert_thread_longform (high visibility by default)
+      - own_dms
+    does_not_see:
+      - dms_involving_others
+      - pre_publish_drafts
+
+  hub_agents:
+    special: "Opinion leaders + amplifiers tienen reach_multiplier elevado. Sus posts alcanzan más agents. Su engagement legitimiza."
+
+  lurkers:
+    special: "Algunos agents nunca postean — solo leen + like. Aportan aggregate signal pero no content. Realistic: mayoría de social feeds es read-only."
+
+turn_dynamics:
+  mode: reactive_with_cascades
+  description: >
+    No es deterministic turn-by-turn. Es algorithm-driven: stimulus arrives,
+    early reactors post, sus posts ganan traction según reach weighting, otros
+    agents ven lo que ganó traction y reaccionan.
+
+  phases:
+    - phase: stimulus_drop
+      rounds: 1
+      actor: brand_or_creative_or_narrative_originator
+      channel: [post_public, expert_thread_longform]
+      timing: "hour 0"
+      description: "El stimulus aparece en el feed (creatividad, campaña lanzada, narrative framing)."
+
+    - phase: first_wave
+      rounds: {min: 3, default: 4, max: 6}
+      actor: opinion_leaders_and_early_adopters
+      actor_selection: "weighted by activity_level + topical_relevance"
+      channel: [post_public, quote_post, reply_threaded]
+      timing: "first 2-6h"
+      description: "Early reactors forman la primera impresión pública."
+
+    - phase: viral_cascade
+      rounds: {min: 4, default: 6, max: 8}
+      actor: broader_panel
+      actor_selection: "weighted by exposure_prob = f(hub_engagement, trend_signals)"
+      channel: [all_public_channels]
+      timing: "6-48h"
+      description: "La wave amplifica. Cascades se forman si hay un hook emotional/controversial."
+
+    - phase: countermovement
+      rounds: {min: 2, default: 3, max: 5}
+      actor: critics_and_opposing_opinion_leaders
+      channel: [post_public, quote_post, expert_thread_longform]
+      timing: "12-72h"
+      description: "Contra-movimiento si hay takes opuestas. Puede bajar el hype o polarizar."
+
+    - phase: decay_or_entrenchment
+      rounds: {min: 2, default: 3, max: 4}
+      actor: subset
+      channel: [post_public, reply_threaded]
+      timing: "3-14 días simulated"
+      description: "Temas nuevos desplazan este tema, o bien se entrenches si viral enough."
+
+propagation_rules:
+  - id: reach_weighting
+    rule: "Cada agent tiene reach_score (0-1) basado en persona. Un post de opinion_leader llega a ~50% del panel; de lurker, ~5%."
+
+  - id: traction_visibility_feedback
+    rule: "Posts con high like_share_signal son más visibles en round siguiente. Esto modela virality natural."
+
+  - id: narrative_mutation
+    rule: >
+      Cuando un post es quote_post'd repetidamente, el narrative MUTA. El venue
+      captura la mutation tree — 'core message' → qué se agrega/se pierde por
+      cada quote_post. Es métrica clave para narrative_framing test_type.
+
+  - id: emotion_amplification_bias
+    rule: "Posts con emotion_valence extrema (muy positivo O muy negativo) ganan ~2x reach. Neutral posts se diluyen."
+
+  - id: cross_tribe_friction_boost
+    rule: "Si un post es quoted por alguien del segment opuesto (critic vs brand_loyalist), engagement x3. Replica la dinámica IRL de outrage algorithms."
+
+  - id: dm_low_propagation
+    rule: "DMs privados no afectan public narrative directamente — pero pueden coordinar a agents (ej. 'hagamos thread juntos'). Effect: next wave más organizada."
+
+  - id: expert_thread_anchor_effect
+    rule: "Un expert_thread_longform setea el frame del narrative para 24-48h. Otros posts lo citan. Puede ser acorralante si es bueno, o counter-effect si critics lo destrozan."
+
+  - id: algorithm_uncertainty
+    rule: "Modelamos reach como probabilistic, no deterministic. Mismo stimulus con mismo seed NO produce viral cascades idéntica — se valida con multi-seed."
+
+special_behaviors:
+  - name: cascade_detection
+    description: >
+      Post-sim, identificamos 'the originating post' de cada cascade de
+      engagement. Util para reporte: 'el anuncio lanzado a 9am fue OK, pero el
+      quote-post del critic Y a las 11am fue lo que realmente prendió el
+      backlash'.
+
+  - name: inflection_points
+    description: "Momento(s) donde el sentiment aggregate cambia direccionalidad. Típicamente asociados a un post específico."
+
+  - name: trending_topics_emergence
+    description: >
+      El venue identifica sub-topics que emergen del stimulus. Útil para
+      narrative_framing — 'vos framease como innovation pero el feed lo terminó
+      framing como price_gouging'.
+
+  - name: amplifier_activation
+    description: >
+      % del panel tagged como 'amplifier' que efectivamente posted. Si es bajo,
+      la creatividad no 'prendió'. Si es alto incluso en critics, es tracción
+      peligrosa para el brand.
+
+qa_hints_per_stage:
+  post_stage_2:
+    - panel_reach_diversity  # ¿el panel tiene mix de high/low reach? (mix realista)
+    - opinion_leader_plausibility  # los opinion leaders extraídos son de la niche relevante
+    - no_generic_influencers  # si aparece "Food Influencer" sin nombre, red flag
+
+  post_stage_4:
+    - persona_coherence  # un critic NO debe postear favorablemente al stimulus
+    - language_drift  # regional social feeds en lenguaje coloquial del país
+    - copy_propagation  # posts entre agents NO deben ser literal copy-paste
+    - cascade_plausibility  # un post lurker no puede generar mega-cascade
+    - emotion_tone_match  # el tone de post matches la platform variant elegido (Twitter más punchy, Reddit más threaded)
+    - competitor_coherence  # competitor account NO amplifica al subject brand
+    - no_corporate_tone_from_consumers  # consumer posts no deben sonar corporate
+
+  post_stage_7:
+    - viral_coefficient_calibrated
+    - narrative_mutation_tree_faithful  # el árbol refleja la sim real
+    - inflection_points_identified_with_evidence
+
+stimulus_delivery:
+  format: campaign_drop_or_creative_exposure_or_narrative_launch
+  round: 1
+  content_template: >
+    "Round 1 — en el feed aparece: {stimulus_description}. Plataforma:
+     {platform_variant}. Posted by: {originator} (empresa/creativo/influencer).
+     Initial reach: {initial_exposure_pct}% del panel."
+  panel_sees: stimulus_content + meta (who posted, when, any trending context)
+
+metrics_surfaced:
+  primary:
+    - viral_coefficient  # R0 adaptado — cuántos post_public genera 1 stimulus
+    - sentiment_distribution_by_segment
+    - recall_24h  # ¿cuántos agents recuerdan el stimulus day-after?
+    - share_ability_score
+    - controversy_risk_pct  # % del panel con negative reaction
+
+  secondary:
+    - inflection_points_count
+    - narrative_mutation_score  # cuánto se deformó el mensaje original
+    - opinion_leader_stance_distribution
+    - cross_tribe_engagement_friction
+
+  for_narrative_framing:
+    - message_stickiness_round5
+    - narrative_drift_tree
+    - emotional_valence_per_framing
+
+  for_brand_sentiment_shift:
+    - brand_attribute_delta (5-10 attrs)
+    - permanent_vs_transient_shift_estimate
+
+limits_of_venue:
+  - "No modela real algorithm changes (platform tweaks, shadowban)"
+  - "No captura offline word-of-mouth (bares, cafés, group chats)"
+  - "Tribe-specific nuances (Gen Z vs millennial vs boomer) son approximations"
+  - "No mide actual conversion (click-through, purchase) — solo sentiment + reach"
+  - "Bot activity real no modelada (solo agents 'humans')"

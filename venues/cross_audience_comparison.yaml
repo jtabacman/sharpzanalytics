@@ -1,0 +1,167 @@
+# venue: cross_audience_comparison
+# Usado por: audience_targeting
+# Setting default: individual_journey_parallel
+
+venue: cross_audience_comparison
+version: "1.0.0"
+status: active
+
+description: >
+  Venue multi-panel sincrónico. N audiencias candidatas (ICPs distintos) reciben
+  el MISMO stimulus. Cada audiencia responde desde su perspectiva sin ver las
+  otras. El test compara resonance entre audiencias para identificar cuál
+  priorizar con budget limitado.
+
+used_by_test_types:
+  - audience_targeting
+
+setting:
+  default_category: individual_journey_parallel
+  rationale: >
+    No interactúan entre sí. Son paneles paralelos evaluated simultáneamente.
+    Cada uno reacciona desde su propia ICP. El venue mide cross-audience
+    differentials, no dynamics internas.
+
+channels:
+  - id: audience_reaction_monologue
+    description: >
+      Cada agente del panel articula su reacción desde su ICP lens. Not shared,
+      not compared. Raw first-person take.
+    visibility: private_internal
+    length_words: {min: 50, max: 200}
+    formality: depends_on_icp
+    actor_types: [icp_persona_varied]
+    frequency: "1 por agent"
+
+  - id: structured_interest_response
+    description: >
+      Response structured: {interest_score_0_10, would_pay: bool, positioning_fit,
+      expansion_potential, concerns}. Aggregated para comparar ICPs.
+    visibility: private_internal
+    length_words: 0  # structured data
+    formality: structured
+    actor_types: [all]
+    frequency: "1 per agent"
+
+  - id: icp_specific_objection
+    description: >
+      Objecciones o concerns especific al ICP. Un enterprise buyer objects
+      a pricing diferente que un SMB buyer objects a features.
+    visibility: private_internal
+    length_words: {min: 20, max: 100}
+    formality: depends_on_icp
+    actor_types: [all]
+    frequency: "variable"
+
+  - id: optional_variant_reaction
+    description: >
+      Si el test tiene variants (A/B positioning), cada agent reaccionar a la
+      variant que le tocó. Compare per-ICP which variant resonates.
+    visibility: private_internal
+    length_words: {min: 30, max: 150}
+    actor_types: [all]
+    frequency: "1 per agent if variants"
+
+visibility_matrix:
+  note: "Cada ICP cluster es island. No cross-cluster visibility."
+  icp_a_agent:
+    sees: [own_reaction]
+    does_not_see: [icp_b_agents_reactions, icp_c_agents_reactions]
+
+  aggregate_analyst:
+    sees: [all_clusters_aggregated]
+    special: "For metric computation only — not an agent."
+
+turn_dynamics:
+  mode: batch_parallel_all_clusters
+  description: >
+    Each ICP cluster runs in parallel but separate. Same stimulus, different
+    responses. Single-round typically, optional follow-up for deep probes.
+
+  phases:
+    - phase: stimulus_expose
+      rounds: 1
+      actor: all_clusters_parallel
+      channel: [audience_reaction_monologue, structured_interest_response, icp_specific_objection]
+      timing: "batch"
+      description: "All agents across all ICPs react to stimulus concurrently."
+
+    - phase: optional_variant_exposure
+      rounds: {min: 0, default: 1, max: 1}
+      actor: all_clusters_parallel
+      channel: optional_variant_reaction
+      timing: "follow-up batch"
+      description: "If variants tested, each agent sees their assigned variant."
+
+propagation_rules:
+  - id: no_inter_cluster_influence
+    rule: "Cluster A's reactions do NOT affect Cluster B's. Independence is the point."
+
+  - id: intra_cluster_independence_too
+    rule: "Within a cluster, agents respond independently. Not a deliberation venue."
+
+  - id: stimulus_identical_across_clusters
+    rule: "Same content delivered to all. Differential response is the signal."
+
+special_behaviors:
+  - name: resonance_ranking
+    description: "ICPs ranked by interest_score aggregate. Tells client who to prioritize."
+
+  - name: cost_to_acquire_inference
+    description: >
+      From ICP characteristics (market size, channel access, price sensitivity),
+      infer CAC. Combined with interest_score → ROI per ICP.
+
+  - name: expansion_potential_estimate
+    description: "Will this ICP upgrade / add seats / expand use? Per-ICP estimate."
+
+  - name: start_here_recommendation
+    description: "Top ICP to prioritize, with rationale. Secondary ICP to address next. ICPs to deprioritize."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - icp_differentiation_real  # ICPs are genuinely distinct, not overlapping
+    - icp_internal_homogeneity  # within an ICP, personas share core traits
+    - icp_relevance_to_product  # all ICPs could plausibly buy
+
+  post_stage_4:
+    - persona_coherence
+    - icp_response_differentiation  # responses actually differ between ICPs
+    - no_generic_reactions  # each response reflects ICP-specific concerns
+    - structured_output_per_icp
+
+  post_stage_7:
+    - resonance_ranking_methodology_clear
+    - cac_estimate_justified
+    - start_here_rationale_concrete
+
+stimulus_delivery:
+  format: product_or_positioning_plus_optional_variants
+  round: 1
+  content_template: >
+    "All clusters see: {product_description}, {positioning}, {price_ranges},
+     {value_prop}. Each cluster receives same content; their reactions are
+     compared."
+
+metrics_surfaced:
+  primary:
+    - resonance_score_per_icp
+    - cost_to_acquire_estimate_per_icp
+    - expansion_potential_per_icp
+    - retention_forecast_per_icp
+
+  secondary:
+    - icp_specific_concerns_ranked
+    - variant_fit_per_icp (if variants)
+    - comparison_summary
+
+  outputs_unique:
+    - ranked_icp_list_with_business_case
+    - start_here_recommendation
+    - icps_to_avoid
+
+limits_of_venue:
+  - "Static stimulus — no reactive refinement by ICP"
+  - "Single-touchpoint — real funnel dynamics (multi-touch discovery) not captured"
+  - "Don't model retention differences deeply — extrapolated"
+  - "ICP evolution (target markets change) is point-in-time"

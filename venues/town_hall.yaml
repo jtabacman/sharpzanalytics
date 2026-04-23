@@ -1,0 +1,340 @@
+# venue: town_hall
+# Usado por: policy_rollout
+# Setting default: in_person_panel + digital_threaded
+
+venue: town_hall
+version: "1.0.0"
+status: active
+
+description: >
+  Foro público donde stakeholders afectados por una policy pueden hacer statement,
+  preguntar, objetar. Combinado con bureaucratic comms internas (memos, compliance
+  forums, regulator communications) + coverage de prensa + community WhatsApp
+  groups. Modela la dinámica real de rollout de policy: hearings + written comments
+  + implementer viability + activist pushback + media framing.
+
+used_by_test_types:
+  - policy_rollout
+
+setting:
+  default_category: in_person_panel
+  combined_with: [digital_threaded, email_async]
+  rationale: >
+    Policy rollout real involucra múltiples surfaces: audiencias públicas
+    (in_person_panel), written comment periods (email_async digital), community
+    chatter (messaging_private), press coverage. El venue los integra porque
+    todos afectan implementation success.
+
+channels:
+  - id: public_hearing_statement
+    description: >
+      Statement formal en hearing. Stakeholder (gainer, loser, implementer,
+      academic, activist) tiene 3-5 minutos de podium time. Recorded and
+      published. Tono formal, preparado.
+    visibility: all_attendees + public_via_record
+    length_words: {min: 100, max: 400}
+    formality: high
+    actor_types: [gainer, loser, local_implementer, voice_academic, voice_advocacy]
+    frequency: "8-15 statements distribuidos across hearings"
+
+  - id: written_public_comment
+    description: >
+      Comment oficial enviado durante public comment period. Formal, escrito,
+      archivable. Más largo y substantivo que hearing statement. Input formal
+      al policy process.
+    visibility: all (via public record)
+    length_words: {min: 200, max: 700}
+    formality: very_high
+    actor_types: [gainer, loser, voice_academic, advocacy_group, industry_association]
+    frequency: "10-20 written comments"
+
+  - id: implementer_viability_memo
+    description: >
+      Memo interno de local implementer (gobierno local, agency staff, field
+      officer) assessing feasibility del rollout. Privado pero eventualmente
+      surfaced en press if leaked or formally published.
+    visibility: agency_internal_then_public
+    length_words: {min: 300, max: 800}
+    formality: very_high
+    actor_types: [local_implementer, agency_staff]
+    frequency: "2-4 memos de distintos implementation sites"
+
+  - id: community_whatsapp_discussion
+    description: >
+      Chatter en WhatsApp groups de afectados (neighborhood, union, business
+      association). Casual, tribal, often misinformation-prone. Donde real
+      acceptance or resistance se forja.
+    visibility: whatsapp_group_members
+    length_words: {min: 15, max: 150}
+    formality: low
+    actor_types: [gainer, loser, neutral_affected]
+    frequency: "high — 30-60 messages distribuidos"
+
+  - id: press_coverage_policy
+    description: >
+      Artículo de outlet cubriendo el policy + rollout progress. Puede framear
+      como success, struggle, controversy. Influye sentiment general.
+    visibility: all
+    length_words: {min: 200, max: 600}
+    formality: high
+    actor_types: [media_outlet, journalist]
+    frequency: "3-6 artículos arc 4-week simulated"
+
+  - id: legal_challenge_filing
+    description: >
+      Court filing challenging la policy. Threshold high — solo si conditions
+      merit legal action (constitutional argument, procedural objection,
+      harm claim). Cambia outlook significantly when filed.
+    visibility: public_via_court_record_then_press
+    length_words: {min: 200, max: 500}
+    formality: very_high
+    actor_types: [advocacy_group, industry_association, law_firm]
+    frequency_cap: low  # 0-2 en la sim
+
+  - id: academic_policy_analysis
+    description: >
+      Op-ed o research brief de academic (economist, policy expert) analizando
+      policy design + likely outcomes. Informado by theory + data. Influence
+      ~medium — informa press framing, less direct on community.
+    visibility: all
+    length_words: {min: 400, max: 900}
+    formality: very_high
+    actor_types: [voice_academic]
+    frequency: "1-3 analyses"
+
+  - id: regulator_compliance_guidance
+    description: >
+      Comunicado formal del regulating agency aclarando implementación,
+      tiempos, compliance pathways. Afecta certainty de los afectados.
+    visibility: all (via agency channels)
+    length_words: {min: 150, max: 500}
+    formality: very_high
+    actor_types: [regulator_agency]
+    frequency: "1-2 guidance docs"
+
+visibility_matrix:
+  gainer:
+    sees: [hearings, written_comments, press_coverage, own_community_whatsapp, academic_analyses, regulator_guidance]
+    special: "Gainers generalmente support, pero may have concerns about implementation timing."
+
+  loser:
+    sees: [hearings, written_comments, press_coverage, own_community_whatsapp, academic_analyses, legal_challenges, advocacy_messaging]
+    special: "Losers activo en hearings + written comments + community push against."
+
+  neutral_affected:
+    sees: [press_coverage (primary), community_whatsapp (some), academic_analyses (low)]
+    special: "Low engagement until policy becomes tangible. News consumers."
+
+  local_implementer:
+    sees: [implementer_viability_memos (peer), regulator_guidance, press, hearings]
+    does_not_see: [general_community_whatsapp]
+    special: "Focus on: can we actually do this? Timing, resources, legal clarity."
+
+  voice_academic:
+    sees: [public_hearings, written_comments, press, peer_academic_analyses, research_data]
+    special: "Analyzes, publishes, may testify. Less on community chatter."
+
+  voice_advocacy:
+    sees: [all_public_channels, own_advocacy_communications, community_signals]
+    special: "Amplifier + organizer. Coordinates messaging across losers + supporters."
+
+  media_outlet:
+    sees: [public_hearings, written_comments, press_releases, social_commentary, leaked_memos]
+    special: "Covers policy arc. May surface leaked implementer memos."
+
+  regulator_agency:
+    sees: [hearings, written_comments, implementer_memos, own_guidance, legal_challenges]
+
+turn_dynamics:
+  mode: rollout_arc_with_phases
+  description: >
+    Policy rollout is SEQUENCED: announcement → comment period → rule finalization
+    → implementation → early results. Venue models 4-6 week simulated window con
+    compressed time.
+
+  phases:
+    - phase: policy_announcement
+      rounds: 1
+      actor: regulator_agency_or_government
+      channel: stimulus_delivery
+      timing: "day 0"
+      description: "Policy announced with talking points. Official text published."
+
+    - phase: first_reactions_wave
+      rounds: {min: 3, default: 4, max: 6}
+      actor: [gainer, loser, voice_advocacy, press]
+      channel: [community_whatsapp, press_coverage, advocacy_communications_social]
+      timing: "days 1-7"
+      description: "First public reactions. Tribal sorting begins."
+
+    - phase: public_comment_period
+      rounds: {min: 4, default: 6, max: 8}
+      actor: [gainer, loser, voice_academic, voice_advocacy, industry_assoc]
+      channel: [public_hearing_statement, written_public_comment]
+      timing: "days 7-21 (compressed from real 30-60 day period)"
+      description: "Formal input process. Hearings held, comments filed."
+
+    - phase: implementer_viability_assessment
+      rounds: {min: 2, default: 3, max: 4}
+      actor: local_implementer
+      channel: implementer_viability_memo
+      timing: "days 10-21 (paralelo a comment period)"
+      description: "Field agencies assess: can we deliver this on timeline?"
+
+    - phase: academic_and_analyst_publication
+      rounds: {min: 1, default: 2, max: 3}
+      actor: voice_academic
+      channel: academic_policy_analysis
+      timing: "days 14-28"
+      description: "Deeper analyses published. Inform informed commentary."
+
+    - phase: legal_challenge_optional
+      rounds: {min: 0, default: 1, max: 2}
+      actor: [advocacy_group, industry_association, law_firm]
+      channel: legal_challenge_filing
+      timing: "days 21-35"
+      description: "If legal grounds, filings happen. Changes outlook dramatically."
+
+    - phase: regulator_clarification
+      rounds: {min: 1, default: 1, max: 2}
+      actor: regulator_agency
+      channel: regulator_compliance_guidance
+      timing: "days 28-35"
+      description: "Agency issues clarifying guidance based on comment period input."
+
+    - phase: early_implementation_signals
+      rounds: {min: 2, default: 3, max: 4}
+      actor: [local_implementer, gainer, loser]
+      channel: [community_whatsapp, press_coverage, support_or_complaint_memos]
+      timing: "days 35-60"
+      description: "Actual rollout begins in pilots. Early evidence of working / not."
+
+propagation_rules:
+  - id: affected_divide_tribal_sorting
+    rule: >
+      Gainers + losers self-sort tribally. Community whatsapp groups align.
+      Cross-tribe dialogue minimal salvo via family ties or mixed community.
+
+  - id: implementer_memo_leak_potential
+    rule: >
+      Implementer memos (privados) pueden leak if the implementer is frustrated.
+      Leak reaches press, amplifies negative framing. Frequency_cap: 0-1 per sim.
+
+  - id: academic_frames_press
+    rule: >
+      When academic_policy_analysis publishes, press_coverage subsequently cites
+      it. Efecto: frames the narrative más técnicamente.
+
+  - id: legal_challenge_changes_everything
+    rule: >
+      Si legal_challenge_filing happens, subsequent phases adjust: implementers
+      slow down (await ruling), press reframes, community uncertainty spikes.
+      Venue models path divergence.
+
+  - id: regulator_guidance_reassurance_or_escalation
+    rule: >
+      Si regulator_compliance_guidance addresses concerns raised en comment period,
+      implementer viability score sube. Si NO addresses, score baja + legal
+      challenge probability aumenta.
+
+  - id: visual_vs_policy_mismatch_risk
+    rule: >
+      A times, la intended policy outcome vs perceived outcome diverge (ej.
+      policy helps low-income via tax credit, but is framed as 'giveaway to
+      cheats'). El venue detects framing gap via press + whatsapp volumes.
+
+  - id: unintended_consequences_surface
+    rule: >
+      Durante early_implementation, unintended_consequences may appear in
+      community_whatsapp antes de press coverage. Venue surfaces these como
+      watchlist metric.
+
+special_behaviors:
+  - name: stakeholder_matrix_gain_lose_vs_voice_power
+    description: >
+      2x2 matrix: gain/lose × high-voice/low-voice. Identify loud-losers (risk
+      group), silent-gainers (supportive but unheard), etc. Essential output.
+
+  - name: implementation_feasibility_per_site
+    description: >
+      From implementer_viability_memo aggregate, estimate feasibility gradient:
+      which sites rollout smoothly, which face friction.
+
+  - name: legal_challenge_probability
+    description: "Calculated from challenge triggers: procedural gap, constitutional question, harm severity, advocacy resource availability."
+
+  - name: unintended_consequences_watchlist
+    description: >
+      Ranked list of potential unintended outcomes surfacing in community
+      chatter + implementer memos. For monitoring post-rollout.
+
+  - name: media_narrative_arc
+    description: "Evolution of dominant framing across press_coverage in simulated 4-week arc. Is tone trending favorable or hostile?"
+
+  - name: compliance_burden_distribution
+    description: "Who pays the compliance cost? Quantified across gainers/losers/implementers."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - jurisdictional_authority_match  # el regulator tiene autoridad sobre este policy area
+    - gainer_loser_plausibility  # los gainers realmente gain? los losers realmente lose?
+    - implementer_sites_relevant  # sitios son donde efectivamente se ejecuta
+    - academic_credential_check  # el academic publica en relevant field
+
+  post_stage_4:
+    - persona_coherence
+    - hearing_tone_formal  # not casual in hearings
+    - whatsapp_tone_casual
+    - implementer_pragmatism  # focus on feasibility, not ideology
+    - academic_data_not_hallucinated
+    - advocacy_coalition_coherence  # no contradictions en advocacy messaging
+    - legal_challenge_basis_plausible  # cuando happens, has genuine grounds
+    - cross_phase_timing_realistic
+    - no_neutral_affected_at_hearings  # hearings attract gainers/losers, not neutral
+    - implementer_memo_internal_tone  # pragmatic, operational
+
+  post_stage_6:
+    - stakeholder_matrix_accurate
+    - unintended_consequences_derived_from_data
+
+  post_stage_7:
+    - implementation_feasibility_gradient_calibrated
+    - legal_challenge_probability_justified
+    - media_narrative_arc_honest  # no overstate success or doom
+
+stimulus_delivery:
+  format: policy_text_plus_talking_points_plus_rollout_plan
+  round: 1
+  content_template: >
+    "Round 1 — policy announcement: {policy_summary}. Rollout timeline: {timeline}.
+     Implementation responsibility: {which agency + sites}. Talking points from
+     government: {key_messages}. Effective date: {date}."
+  panel_sees: policy_full_text + implementation_plan + stakeholder_briefing
+
+metrics_surfaced:
+  primary:
+    - acceptance_rate_by_stakeholder_class
+    - implementation_feasibility_pct
+    - unintended_consequences_watchlist_count
+    - legal_challenge_probability_0_1
+    - media_narrative_arc_trend
+
+  secondary:
+    - hearing_turnout_by_segment
+    - written_comment_volume_by_stance
+    - community_whatsapp_sentiment_distribution
+    - implementer_memo_concerns_ranked
+    - cross_jurisdictional_friction
+
+  outputs_unique:
+    - stakeholder_matrix_gain_lose_x_power_voice
+    - implementation_risk_map
+    - unintended_consequences_ranking
+
+limits_of_venue:
+  - "Real rollout takes months/years — venue compresses to weeks"
+  - "Political economy of implementation (bureaucratic capture, elite pushback) simplified"
+  - "Judicial decision-making not modeled — legal_challenge is filed but outcome not predicted"
+  - "Cultural specificity per region very important — test must be calibrated per geography"
+  - "Dynamic policy adjustment (agency changes rule mid-rollout) not modeled"
+  - "Network effects between policies (how this interacts with adjacent rules) not captured"

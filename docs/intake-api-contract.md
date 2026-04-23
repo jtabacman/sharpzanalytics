@@ -394,13 +394,16 @@ Sin rewrite del Vue SPA. El cliente no nota el cambio.
 
 ---
 
-## 9. Open items
+## 9. Decisiones v0 (2026-04-23)
 
-1. **Stripe integration** — ¿está ya en el intake o lo agregamos backend-side en `/submit`?
-2. **Email notifications** — ¿qué sender usamos? Resend, Postmark, SES? (no bloquea v0 — podemos logear en el operador y notificar manual)
-3. **File upload** — el intake upload PDF/video/image. ¿Vercel Blob, R2, S3? La URL termina en `test_type_specific.stimulus_url` pero el endpoint de upload es aparte.
-4. **Rate limits + abuse protection** — intake es público-ish. Necesita Captcha o rate limit por IP al menos.
+1. **Stripe: NO integrado en v0.** Payments manuales (invoice email post-operator approval). Los campos `tier_selected`, `payment_status`, `stripe_session_id` del schema permanecen como opcionales/nullable — el operador los setea manual en el admin panel cuando cobra fuera de banda.
+
+2. **Email notifications v0:** single provider **Resend** (developer-friendly, API simple, free tier cubre 100/día). Fallback log-only si no configurado.
+
+3. **File upload v0:** **Cloudflare R2** (S3-compatible, $0.015/GB/mes). Backend genera signed URL de upload → frontend PUT directo → backend valida y persiste metadata. El path final queda en `test_type_specific.stimulus_url`.
+
+4. **Rate limits v0:** SlowAPI middleware, 10 req/min por IP en endpoints anonymous (`POST /api/intakes`), 60 req/min autenticados. Captcha (Cloudflare Turnstile) solo si vemos abuse real.
 
 ---
 
-**Fin v0.1.** Backend V2 implementa este contrato en Paso 4 del plan maestro. Cualquier desviación se documenta acá antes de escribir código.
+**Fin v0.2.** Backend V2 implementa este contrato en Paso 4 del plan maestro. Cualquier desviación se documenta acá antes de escribir código.

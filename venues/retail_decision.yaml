@@ -1,0 +1,226 @@
+# venue: retail_decision
+# Usado por: pricing_test, product_launch (partial)
+# Setting default: retail_context
+
+venue: retail_decision
+version: "1.0.0"
+status: active
+
+description: >
+  Contexto de compra de un consumer regular. El agente "encuentra" el producto en
+  un canal de compra (supermercado, e-commerce, marketplace, local físico, DTC)
+  con exposure breve. Decide individualmente (compra / rechazo / considera) basado
+  en precio + packaging + beneficios percibidos. Post-decisión puede dejar review
+  público o comentar en WOM privado, pero NO delibera con otros agents del panel
+  en real-time. Cada agent es una muestra independiente.
+
+used_by_test_types:
+  - pricing_test
+  - product_launch  # partial — combined with product_usage_simulation
+
+setting:
+  default_category: retail_context
+  rationale: >
+    La decisión de compra de un consumer es mayormente individual e instantánea.
+    No hay "deliberación de IC" ni rounds de Q&A. El agente ve el producto, tiene
+    reacción interna, decide, y eventualmente comparte public o privado.
+  channel_variants:
+    - e_commerce: "browsing, comparing, cart abandonment possible"
+    - supermarket_shelf: "aisle decision, competitor adjacent, impulse vs planned"
+    - dtc_website: "brand-first experience, full story exposure"
+    - marketplace: "price comparison, reviews visible, shipping costs factor"
+
+channels:
+  - id: decision_monologue
+    description: >
+      El pensamiento interno del agente al encontrarse con el producto. First-person
+      stream: "¿Me sirve?, ¿el precio es razonable?, ¿confío en la marca?". NO es
+      público — es el signal base privado que el panel genera.
+    visibility: private_internal
+    length_words: {min: 50, max: 200}
+    formality: low
+    actor_types: [consumer, opinion_leader, critic]
+    frequency: "1 per agent per exposure — el core del signal"
+
+  - id: purchase_decision
+    description: >
+      La decisión structured: BUY / CONSIDER_LATER / REJECT + reason + price_point
+      encountered + confidence 0-100. Este es el metric primary del venue.
+    visibility: private_internal
+    length_words: {min: 10, max: 50}
+    formality: structured  # no prose, structured data
+    actor_types: [consumer, opinion_leader, critic]
+    frequency: "1 per agent"
+
+  - id: review_public
+    description: >
+      Review público post-compra (o post-reject). Puede ser 1-5 estrellas con texto,
+      o post en social sobre el producto. Solo algunos agents dejan review
+      (aprox 30-50%). Público, visible por agents que ven reviews en el venue
+      antes de su propia decisión (effect: social proof).
+    visibility: public
+    length_words: {min: 20, max: 100}
+    formality: medium
+    actor_types: [consumer, opinion_leader]
+    frequency: "30-50% of agents who interacted"
+
+  - id: wom_private
+    description: >
+      Word-of-mouth privado entre dos agents del mismo segment (amigos, familia,
+      coworker). 'Te recomiendo/no te recomiendo [producto]'. Dyadic.
+    visibility: dyadic_same_segment
+    length_words: {min: 15, max: 50}
+    formality: low
+    actor_types: [consumer, opinion_leader]
+    frequency: "20-30% of agents initiate a WOM thread"
+
+  - id: expert_analysis
+    description: >
+      Review o análisis de un opinion_leader (reviewer, influencer category-expert).
+      Más profundo que review_public, tiene autoridad. Público, más peso en shape
+      de opinión.
+    visibility: public
+    length_words: {min: 150, max: 400}
+    formality: medium_high
+    actor_types: [opinion_leader]
+    frequency: "1 per opinion_leader (8-12% del panel)"
+
+visibility_matrix:
+  consumer:
+    sees:
+      - review_public (pre-decision si exposure es e_commerce o marketplace)
+      - expert_analysis (si el agent sigue al expert)
+      - own_wom_threads
+    does_not_see:
+      - other_consumers_decision_monologue
+      - other_consumers_purchase_decision
+    rationale: "En retail real, el consumer ve reviews + influencer content, no el pensamiento interno de otros."
+
+  opinion_leader:
+    sees:
+      - review_public
+      - expert_analysis (peer leaders)
+      - own_wom_threads
+    does_not_see:
+      - private_monologues_de_otros
+    rationale: "Similar al consumer — quotes reviews en su análisis, no ve la intimidad de otros."
+
+  critic:
+    sees: [review_public, expert_analysis]
+    special: "Critics tienen bias deliberado — baseline skeptical. Su monologue suele tener objeciones más duras."
+
+  media_trade:
+    sees: [review_public, expert_analysis, purchase_decisions_aggregated]
+    special: "La media_trade no actúa en cada exposure; escribe 1-2 artículos sobre el producto agregando el signal."
+
+turn_dynamics:
+  mode: batch_parallel
+  description: >
+    A diferencia de pitch_meeting, retail_decision NO tiene rounds deliberativos.
+    El venue corre en modo 'batch parallel': todos los agents se exponen al
+    producto conceptualmente al mismo tiempo, deciden en paralelo, y luego
+    un subset produce outputs públicos (reviews, WOM, expert_analysis) en una
+    segunda wave.
+
+  phases:
+    - phase: stimulus_exposure
+      rounds: 1
+      actor: all_agents_parallel
+      channel: [decision_monologue, purchase_decision]
+      timing: "conceptual — batch"
+      description: "Todos los agents reciben el stimulus (product + pricing variant assigned) y producen monologue + decision."
+
+    - phase: public_sharing
+      rounds: 1
+      actor: subset_agents
+      actor_selection: "30-50% random weighted by persona.share_propensity"
+      channel: [review_public, expert_analysis]
+      timing: "simulated day 1-7 post exposure"
+      description: "Los agents que tienen share_propensity alta dejan review. Opinion leaders producen expert_analysis."
+
+    - phase: wom_propagation
+      rounds: 1
+      actor: subset_agents
+      actor_selection: "20-30% random initiators + their dyadic partners"
+      channel: wom_private
+      timing: "paralelo a public_sharing"
+      description: "Algunos agents inician WOM threads con peers de su segment. Feedback del partner puede modificar su own decision (ligero)."
+
+variant_assignment:
+  strategy: random_weighted_per_agent
+  description: >
+    En pricing_test típicamente hay 2-5 pricing variants. Cada agent es asignado
+    a UNA variant random (con peso para balancear exposure). El agent NUNCA ve
+    las otras variants — su decisión se toma en base a la variant que le tocó.
+  balancing_rule: "distribución uniform entre variants por segment"
+
+propagation_rules:
+  - id: no_deliberation
+    rule: "No hay rounds de back-and-forth. El signal es individual + public/WOM spreading."
+
+  - id: social_proof_one_way
+    rule: "Agents en e_commerce channel pueden VER reviews_public antes de decidir (social proof). Otros channels no."
+
+  - id: expert_influence_cascade
+    rule: "Si un opinion_leader publica expert_analysis negativo, agents de su niche que ven el analysis ajustan su monologue (modelled como +/- 5-15% en purchase_decision confidence)."
+
+  - id: cross_variant_isolation
+    rule: "Agents de variant A NO ven monólogos, decisiones, o reviews de agents de variant B. El experimento es entre variants, no dentro."
+
+  - id: wom_transferable_info
+    rule: "En un WOM thread, el initiator puede mencionar 'este precio me parece caro/bueno' y el partner tenerlo en cuenta. Pero el partner tiene SU propia variant assigned — la influencia es sobre confidence, no sobre decision directa."
+
+special_behaviors:
+  - name: price_anchoring_detection
+    description: "Si el panel incluye multiple variants con diferencia >30% en precio, los agents pueden mostrar anchor effects. El venue captura esto como metric separado."
+
+  - name: packaging_vs_price_tension
+    description: "Un premium packaging con precio bajo puede activar 'too good to be true' skepticism. El monologue lo refleja."
+
+  - name: competitor_adjacency
+    description: "En supermarket_shelf y marketplace channels, el agent 've' productos competidores en el mismo contexto. El decision_monologue puede mencionar explícitamente la comparación."
+
+qa_hints_per_stage:
+  post_stage_2:
+    - demographic_distribution_sanity  # ¿el panel refleja el target demographic del brief?
+    - exclude_entity_types_respected  # NO deben aparecer investors o regulators como agents
+
+  post_stage_4:
+    - response_coherence  # cada monologue consistente con persona bio
+    - structured_output_compliance  # purchase_decision debe tener fields: decision, price_seen, confidence, reason
+    - no_cross_variant_contamination  # un agent de variant A citando detalles de variant B = bug
+    - review_authenticity  # las reviews no deben sonar artificialmente balanced todas; variedad natural
+
+  post_stage_7:
+    - distribution_vs_narrative  # la narrativa del reporte debe reflejar la distribución real
+    - price_elasticity_calibration  # el elasticity estimate debe derivarse de la data, no ser inventado
+
+stimulus_delivery:
+  format: product_with_pricing_variant_assigned
+  round: 1
+  content_template: >
+    "Encontrás [producto] en [canal]. Ves: packaging description, product description,
+     price: [variant_price]. [Optional: competitor adjacent info if channel=supermarket].
+     Tenés N segundos para decidir."
+  panel_sees: product_spec_plus_price_only  # no story-telling del brand
+
+metrics_surfaced:
+  primary:
+    - intent_to_buy_pct_by_variant
+    - price_elasticity_between_variants
+    - willingness_to_pay_ceiling
+    - rejection_reasons_ranked
+    - upsell_accept_rate (if variants include upsells)
+
+  secondary:
+    - review_sentiment_distribution
+    - wom_activation_rate
+    - expert_analysis_tone
+    - social_proof_effect_size
+
+limits_of_venue:
+  - "Intent-to-buy simulated ≠ actual purchase — gap típico 20-40%"
+  - "No modela repeat purchase ni LTV — solo first buy"
+  - "No incluye channel dynamics: retailer margin, shelf placement, promotional stacking"
+  - "Competitor price is static at time of test — doesn't model rival reactions"
+  - "El venue asume awareness — no mide 'discovery' en si"
