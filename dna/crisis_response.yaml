@@ -1,0 +1,361 @@
+# dna: crisis_response
+# Version: 1.0.0
+# Schema reference: docs/dna-spec.md
+
+test_type: crisis_response
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Evaluar variantes de respuesta a una crisis de reputación antes de enviar
+    la respuesta real al mundo.
+  decision_question: >
+    ¿Cómo respondemos al crisis? ¿Apology + remediation, denial + legal stance,
+    silence + slow action, o counter-narrative? ¿O mejor NO responder?
+  buyer_profile:
+    - "Head of comms / PR lead"
+    - "CEO / COO en crisis management mode"
+    - "PR firm con cliente en crisis"
+    - "Legal counsel coordinando response strategy"
+  typical_trigger: >
+    Durante crisis activa (first 48-72h critical window) O post-crisis evaluando
+    escalation path. Stimulus es el crisis summary + variant responses candidatas.
+  decision_outputs: [GO_VARIANT_A, GO_VARIANT_B, GO_VARIANT_C, GO_SILENCE, NO_GO_ALL]
+
+panel:
+  anchors_spec:
+    count: {min: 6, max: 10, recommended: 8}
+    field_schema_ref: "prompts/crisis_response/intake.yaml#anchors"
+    examples:
+      - "Afectado directo (customer con daño real)"
+      - "Público general interesado"
+      - "Periodista de trade press industry"
+      - "Regulator / watchdog relevante"
+      - "Advocacy group / activist coalition"
+      - "Competidor observando (potential opportunist)"
+      - "Empleado interno (posible whistleblower)"
+      - "Shareholder / institutional inversor"
+      - "Class action law firm (risk indicator)"
+      - "Celebrity o public figure watcher"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competitor, count: "2-4", rationale: "Competidores que podrían aprovechar la crisis"}
+      - {type: regulator, count: "1-3", rationale: "Agencies con autoridad real sobre la empresa"}
+      - {type: advocacy_group, count: "1-3", rationale: "ONGs/activists con causa relacionada"}
+      - {type: media_outlet, count: "5-8", rationale: "Outlets que cubren esta industry/geo"}
+      - {type: class_action_law_firm, count: "1-2", rationale: "Risk indicators si harm es grave"}
+      - {type: industry_association, count: "1-2", rationale: "Industry bodies que podrían posicionarse"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 80
+    per_anchor_cap: [5, 15]
+    formula: "M = round(target_pool / K)"
+
+  composition_targets:
+    affected_pct: {min: 25, max: 35}
+    general_public_pct: {min: 15, max: 25}
+    press_pct: {min: 12, max: 18}
+    regulator_pct: {min: 10, max: 18}
+    advocacy_pct: {min: 8, max: 12}
+    competitor_pct: {min: 5, max: 10}
+    employee_pct: {min: 2, max: 5}
+
+  exclude_entity_types:
+    - UnrelatedConsumerCategory
+    - DistantInternationalMarket_not_involved
+    - InvestorFundUnrelated
+
+  quality_requirements:
+    bio_length_min_words: 300
+    bio_length_target_words: 400
+    persona_realism_score_min: 0.7
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 80, min: 60, max: 120}
+  duration:
+    simulated_time: "10d_post_response"
+    wall_clock_target_minutes: 15
+  rounds:
+    min: 18
+    default: 24
+    max: 30
+    delivery_round: 1
+    interview_cutoff_round: 24
+  propagation:
+    type: venue_rules
+    cross_agent_visibility: mixed
+    info_decay: event_driven_cascades
+
+setting:
+  category: hybrid_multi_channel
+  description: >
+    Crisis requiere respuesta simultánea en múltiples canales: press conference
+    (broadcast), customer support (1-on-1), social media (digital feed),
+    regulator engagement (email_async), internal comms (memo). Cada canal
+    con tono, latency y visibility propios.
+  channels_with_settings:
+    press_conference: {setting: broadcast_one_to_many, formality: high}
+    customer_support: {setting: phone_support_or_email, formality: medium}
+    social_response: {setting: digital_feed, formality: low_to_medium}
+    regulator_engagement: {setting: email_async, formality: very_high}
+    internal_memo: {setting: email_async, formality: medium_high}
+
+venue:
+  reference: "venues/split_public_private.yaml"
+  combined_with_secondary: "venues/press_cycle.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, video_optional_ultra]
+  formats_rejected_with_message:
+    image_only: "Crisis context requiere texto narrativo detallado — imágenes solo como supplementary"
+  required_fields:
+    - crisis_summary                # resumen de qué pasó + cuándo + severity
+    - company_statement_variants    # 2-4 variants de respuesta oficial
+    - timeline_of_events            # eventos clave ordenados
+    - affected_parties_description  # quiénes son los damnificados
+  variants_min: 2
+  variants_max: 4
+  variants_examples_for_intake:
+    - name: "Apology + immediate remediation + compensation fund"
+      short: "apology_remediate"
+    - name: "Denial + legal stance + countersuit warning"
+      short: "deny_legal"
+    - name: "Silence + slow action behind scenes"
+      short: "silence_slow"
+    - name: "Counter-narrative + blame external factors"
+      short: "counter_narrative"
+  optional_fields:
+    - legal_constraints_brief
+    - shareholder_pressure_context
+    - historical_similar_crises
+
+metrics:
+  primary:
+    - trust_restoration_pct_by_segment
+    - escalation_risk_boycott
+    - escalation_risk_class_action
+    - escalation_risk_regulator_action
+    - narrative_control_score
+  secondary:
+    - employee_internal_sentiment
+    - competitor_opportunistic_moves
+    - simulated_press_coverage_arc_10d
+    - affected_satisfaction_post_support
+    - advocacy_influence_peak
+    - social_virality_of_criticism
+  never_emphasize:
+    - vanity_metrics
+    - reach_without_sentiment
+    - engagement_without_stance
+  aggregation_rules:
+    trust_restoration_pct_by_segment:
+      computation: "post-sim trust intent vs baseline per segment"
+      confidence: "inter-run variance for tier multi-run"
+      breakdown_by: [segment_type, demographic, involvement_level]
+
+report:
+  required_sections:
+    - executive_summary
+    - context_of_crisis
+    - variant_comparison
+    - reaction_by_segment
+    - simulated_coverage_arc
+    - regulator_action_probability
+    - boycott_risk
+    - recommended_variant_with_rationale
+    - what_to_monitor
+    - honest_caveats
+    - silence_option_analysis
+    - appendices
+  optional_sections:
+    - secondary_crisis_risk_assessment
+    - competitive_exploitation_vectors
+  unique_sections:
+    - simulated_press_coverage_arc
+    - regulator_action_probability
+    - silence_option_analysis
+  length_target: {min_words: 5500, target_words: 7000}
+  quote_requirements:
+    min_validated: 18
+    validation_method: embedding_similarity_or_rapidfuzz
+    threshold_embedding: 0.85
+  language_policy:
+    default: match_intake_locale
+    regional_variants: aware
+    quotes_preserve_original: true
+  special_output:
+    no_go_legitimate: true
+    silence_option_always_evaluated: true
+
+one_pager:
+  structure: SHARED_V1
+  length: {min_words: 400, max_words: 600}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - {name: phantom_entities, auto_fix: remove_on_high_confidence}
+      - {name: off_target_archetype, auto_fix: regenerate_variant}
+      - {name: regulator_jurisdiction_match, critical: true, escalate_on: "regulator sin autoridad sobre empresa"}
+      - {name: media_outlet_relevance, method: llm_industry_match}
+      - {name: advocacy_alignment, method: llm_cause_relation}
+      - {name: competitor_real_competitor, critical: true}
+      - {name: class_action_law_firm_relevant, method: llm_jurisdiction_harm_match}
+      - {name: duplicates_encoding, auto_fix: always}
+
+  post_stage_4:
+    checks:
+      - {name: persona_coherence, scope: "20% sample + high-activity 100%"}
+      - {name: factual_hallucination, critical_flag: invented_law_regulator_or_statute}
+      - {name: competitor_coherence, critical: true, rule: "competidor NO debe apoyar a la empresa en crisis"}
+      - {name: affected_party_coherence, rule: "afectado con daño real no debe sonar neutral"}
+      - {name: language_drift, escalate_on: "> 5% off-locale"}
+      - {name: channel_formality_match, rule: "regulator very_high; social low — invert = bug"}
+      - {name: copy_propagation, threshold: 0.92}
+      - {name: temporal_realism, rule: "response timing plausible"}
+      - {name: cascade_plausibility, rule: "story legs o decay con rationale in-world"}
+      - {name: no_support_ticket_gratuitous_leaks, rule: "leaks solo si quality mala real"}
+      - {name: regulator_formality_preserved, critical: true}
+      - {name: employee_leak_conditional, rule: "leaks solo si conditions match (ver venue rules)"}
+
+  post_stage_6:
+    checks:
+      - {name: quote_validation, critical: true}
+      - {name: exaggeration}
+      - {name: agent_attribution}
+      - {name: coverage_arc_plausibility}
+      - {name: no_double_counting_cascades}
+
+  post_stage_7:
+    checks:
+      - {name: winner_confidence_calibration, critical: true}
+      - {name: caveat_erosion, critical: true}
+      - {name: optimism_bias, critical: true, rule: "NO everything is great en crisis report"}
+      - {name: no_go_considered, critical: true, rule: "silence/no_go option DEBE ser evaluada"}
+      - {name: structural_compliance}
+      - {name: silence_option_analysis_present, critical: true}
+
+  anti_bias_invariants:
+    - "Crisis reports DEBEN favorecer honestidad sobre optimismo falso"
+    - "Si todas las variants empeoran la situación, el reporte DEBE recomendar NO-GO"
+    - "QA no suaviza caveats legítimas para proteger al cliente"
+    - "Regulator action probability no se minimiza si la evidence lo sustenta"
+
+tier_overrides:
+  economy:
+    simulation: {panel_size_default: 60, rounds_default: 18}
+    multi_run: 1
+    models:
+      amplifier: pro  # crisis > economy para crisis incluso en tier bajo
+      persona_generator: pro
+      sim_agent_action: economy
+      interview: pro
+      narrative: pro
+      executive_judge: premium
+      qa_reviewer: pro
+
+  pro:
+    simulation: {panel_size_default: 80, rounds_default: 24}
+    multi_run: 3
+    models:
+      amplifier: pro
+      persona_generator: pro
+      sim_agent_action: pro
+      interview: pro
+      narrative: pro
+      executive_judge: premium
+      qa_reviewer: pro
+
+  premium:
+    simulation: {panel_size_default: 100, rounds_default: 28}
+    multi_run: 5
+    models:
+      amplifier: premium
+      persona_generator: premium
+      sim_agent_action: pro
+      interview: premium
+      narrative: premium
+      executive_judge: ultra
+      qa_reviewer: premium
+
+  ultra:
+    simulation: {panel_size_default: 120, rounds_default: 30}
+    multi_run: 10
+    models:
+      amplifier: ultra
+      persona_generator: ultra
+      sim_agent_action: premium
+      interview: ultra
+      narrative: ultra
+      executive_judge: ultra
+      qa_reviewer: ultra
+    features_unlocked:
+      - multi_lang
+      - multi_modal_video_statement
+      - live_operator_intervention
+      - regional_subpanel_comparison
+
+limits:
+  - "No sustituye asesoramiento legal real de litigation counsel"
+  - "Regulators reales tienen información no-pública que el panel no modela"
+  - "Crisis dynamics evolutivas (new info hour-by-hour) no en el test — es snapshot"
+  - "El test asume que la respuesta se ejecuta bien — no modela falla de ejecución"
+  - "Panel no captura tail risks de celebrities o individuos high-profile con impacto desproporcionado"
+  - "Regional/cultural differences en crisis response pueden requerir test per región"
+  - "Legal proceedings dynamics (discovery, motions) fuera del modelo"
+  - "Cross-jurisdictional regulator coordination no representado"
+
+cross_test_learning:
+  patterns_to_extract:
+    count_per_test: "5-10"
+    examples:
+      - "company_crisis_archetype_history"
+      - "regional_regulator_escalation_patterns"
+      - "advocacy_coalition_activation_triggers"
+      - "trust_restoration_velocity_by_severity"
+      - "employee_leak_probability_conditions"
+  priors_relevance:
+    window: "tests_same_client_same_type_last_24_months"
+    max_priors_injected: 6
+  scoping_rules:
+    strict: "priors per-client per-type sin mixing"
+    strict: "historical crisis data es sensitive — manejar con cuidado en reports"
+
+pricing_recommendation:
+  default_tier: premium
+  notes: >
+    Crisis_response rara vez amerita economy — el costo de decisión mala es muy
+    alto. Default premium. Ultra cuando exposed liability > 50M o public company
+    con shareholder exposure.
+  upgrade_triggers:
+    - {trigger: "exposed_liability > 50M_usd OR public_company_SEC_reportable", suggest: ultra}
+    - {trigger: "active_class_action_filed OR active_regulator_investigation", suggest: ultra}
+    - {trigger: "crisis_involves_physical_harm_or_fatalities", suggest: ultra}
+  downgrade_acceptable:
+    - {trigger: "minor_brand_perception_issue_no_legal_exposure", suggest: pro}
+
+prompts:
+  intake_schema: "prompts/crisis_response/intake.yaml"
+  amplifier: "prompts/crisis_response/amplifier.yaml"
+  entity_extractor: "prompts/crisis_response/entity_extractor.yaml"
+  persona_generator: "prompts/crisis_response/persona.yaml"
+  stimulus_delivery: "prompts/crisis_response/stimulus_delivery.yaml"
+  agent_action_press: "prompts/crisis_response/action_press.yaml"
+  agent_action_social: "prompts/crisis_response/action_social.yaml"
+  agent_action_support: "prompts/crisis_response/action_support.yaml"
+  agent_action_regulator: "prompts/crisis_response/action_regulator.yaml"
+  agent_action_advocacy: "prompts/crisis_response/action_advocacy.yaml"
+  agent_action_competitor: "prompts/crisis_response/action_competitor.yaml"
+  agent_action_internal_leak: "prompts/crisis_response/action_internal_leak.yaml"
+  interview: "prompts/crisis_response/interview.yaml"
+  narrative_per_variant: "prompts/crisis_response/narrative.yaml"
+  executive_judge: "prompts/crisis_response/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/crisis_response/qa_reviewer.yaml"
+  pattern_extractor: "prompts/crisis_response/pattern_extractor.yaml"

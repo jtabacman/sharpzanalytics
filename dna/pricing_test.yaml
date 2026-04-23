@@ -1,0 +1,312 @@
+# dna: pricing_test
+# Version: 1.0.0
+# Schema reference: docs/dna-spec.md
+
+test_type: pricing_test
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 2-5 precios distintos con una audiencia sintética realista para
+    descubrir el punto óptimo de intent-to-buy antes de launch.
+  decision_question: >
+    ¿A qué precio lanzamos?
+  buyer_profile:
+    - "CMO o Head of Product de marca de consumo"
+    - "Head of Growth / Pricing lead en SaaS consumer"
+    - "Brand manager pre-launch"
+    - "DTC founder evaluando re-pricing"
+  typical_trigger: >
+    Pre-launch de producto nuevo, re-pricing de línea existente, o expansion a
+    mercado nuevo con pricing strategy abierto.
+  decision_outputs: [GO_PRICE_A, GO_PRICE_B, GO_PRICE_C, NEED_MORE_DATA]
+
+panel:
+  anchors_spec:
+    count: {min: 4, max: 8, recommended: 6}
+    field_schema_ref: "prompts/pricing_test/intake.yaml#anchors"
+    examples:
+      - "Consumer regular del target demographic"
+      - "Opinion leader / reviewer del category"
+      - "Critic / skeptic price-sensitive"
+      - "Brand loyalist de competidor"
+      - "Early adopter tech-forward"
+      - "Aspirational buyer one-level-up"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_brand, count: "3-5", rationale: "Competitors mencionados en el price_positioning"}
+      - {type: retailer_category, count: "2-3", rationale: "Channels donde se vendería (supermarket/e-comm/DTC)"}
+      - {type: review_platform, count: "1-2", rationale: "G2/Trustpilot/Amazon reviews representative"}
+      - {type: category_media, count: "2-3", rationale: "Consumer trade press, category reviewers"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 800
+    per_anchor_cap: [80, 200]
+    formula: "M = round(target_pool / K)"
+
+  composition_targets:
+    consumers_regular_pct: {min: 65, max: 75}
+    opinion_leaders_pct: {min: 8, max: 12}
+    critics_pct: {min: 8, max: 12}
+    media_pct: {min: 5, max: 10}
+    early_adopter_pct: {min: 3, max: 8}
+
+  exclude_entity_types:
+    - InvestorFund
+    - RegulatorGovernmentAgency
+    - CorporateProcurement
+    - EnterpriseBuyingCommittee
+
+  quality_requirements:
+    bio_length_min_words: 150
+    bio_length_target_words: 200
+    persona_realism_score_min: 0.65
+
+simulation:
+  mode: survey_batch
+  panel_size: {default: 800, min: 200, max: 2000}
+  duration:
+    wall_clock_target_minutes: 10
+  rounds: 1
+  propagation:
+    type: none
+    cross_agent_visibility: limited_social_proof_only
+  survey_config:
+    questions_ref: "prompts/pricing_test/survey_questions.yaml"
+    response_format: structured
+    batch_size: 100
+    parallelism: 50
+
+setting:
+  category: retail_context
+  description: >
+    El agente "encuentra" el producto en su contexto de compra habitual
+    (supermercado, e-commerce, local físico, DTC). Exposure breve, decisión
+    individual, puede comentar post-decisión pero NO interactúa con otros
+    agents del panel en real-time.
+  message_tone_defaults:
+    formality: low
+    technical_density: low
+    emotion_expression: moderate
+    hedging_norm: low
+  non_verbal_signals_accepted: false
+  latency_between_turns: N/A
+  channel_variants:
+    - e_commerce: "browsing, comparing, cart decision"
+    - supermarket_shelf: "aisle decision, competitor adjacent"
+    - dtc_website: "brand-first, full story exposure"
+    - marketplace: "price comparison, reviews visible"
+
+venue:
+  reference: "venues/retail_decision.yaml"
+
+stimulus:
+  formats_accepted: [pdf, image, text_paste]
+  formats_rejected_with_message:
+    video: "Video ads pertenecen a creative_test, no pricing_test"
+  required_fields:
+    - product_description
+    - pricing_variants  # 2-5 puntos de precio a testear
+    - packaging_reference_optional
+    - target_channel  # supermarket / e_commerce / dtc / marketplace
+  variants_min: 2
+  variants_max: 5
+  optional_fields:
+    - competitor_pricing_snapshot
+    - regional_variations
+    - bundle_options
+  delivery_format:
+    one_variant_per_agent: random_assignment_weighted_by_segment_balance
+    extraction_method: vision_llm
+    panel_sees: product_spec + assigned_price + channel_context
+
+metrics:
+  primary:
+    - intent_to_buy_pct_by_variant
+    - price_elasticity_between_variants
+    - willingness_to_pay_ceiling
+    - reasons_to_reject_ranked
+    - upsell_accept_rate
+  secondary:
+    - segment_price_sensitivity_clusters
+    - brand_association_strength_delta
+    - competitor_comparison_mentions
+    - review_propensity_signal
+    - social_proof_sensitivity
+  never_emphasize:
+    - deliberation_dynamics
+    - inflection_points
+    - cascade_detection
+  aggregation_rules:
+    intent_to_buy_pct_by_variant:
+      computation: "% of agents assigned to variant who said BUY"
+      confidence: "bootstrap 1000, 90% CI"
+      breakdown_by: [archetype, demographic_bucket, channel_variant]
+
+report:
+  required_sections:
+    - executive_summary
+    - context_of_experiment
+    - demand_curve
+    - segmentation_by_sensitivity
+    - variant_ranking
+    - reasons_to_reject
+    - strongest_elements
+    - anchor_pricing_recommendations
+    - what_to_monitor
+    - honest_caveats
+    - appendices
+  optional_sections:
+    - elasticity_stress_test
+    - competitive_context
+  unique_sections:
+    - estimated_demand_curve
+    - price_sensitivity_clusters
+    - anchor_pricing_recommendations
+  length_target: {min_words: 4500, target_words: 5500}
+  quote_requirements:
+    min_validated: 20
+    validation_method: embedding_similarity_or_rapidfuzz
+    threshold_embedding: 0.85
+  language_policy:
+    default: match_intake_locale
+
+one_pager:
+  structure: SHARED_V1
+  length: {min_words: 400, max_words: 600}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - {name: phantom_entities, auto_fix: remove_on_high_confidence}
+      - {name: off_target_archetype, auto_fix: regenerate_variant}
+      - {name: demographic_distribution_sanity, method: chi_square_vs_brief_target}
+      - {name: duplicates_encoding, auto_fix: always}
+      - {name: excluded_types_present, method: check_exclude_list}
+
+  post_stage_4:
+    checks:
+      - {name: response_coherence, method: llm_persona_vs_response}
+      - {name: factual_hallucination, critical_flag: invented_product_feature}
+      - {name: language_drift, escalate_on: "> 5% off-locale"}
+      - {name: duplicate_responses, method: embedding_0.95, critical: "large sample means duplicates MUST be random"}
+      - {name: structured_output_compliance, method: schema_validate}
+      - {name: no_cross_variant_contamination, critical: true}
+      - {name: review_authenticity_distribution, target: "natural variety in tone"}
+
+  post_stage_6:
+    checks:
+      - {name: quote_validation, critical: true}
+      - {name: distribution_vs_narrative, method: compare_stats_vs_narrative_claims}
+      - {name: exaggeration, method: llm}
+
+  post_stage_7:
+    checks:
+      - {name: winner_confidence_calibration, critical: true}
+      - {name: caveat_erosion}
+      - {name: optimism_bias}
+      - {name: structural_compliance}
+      - {name: price_elasticity_math_sanity, method: programmatic}
+
+  anti_bias_invariants:
+    - "QA no modifica opiniones — solo coherencia + factualidad"
+    - "Skeptical segments no se vuelven favorables artificialmente"
+    - "Quote validator NO accepta quotes plausible — solo sim_log matches"
+
+tier_overrides:
+  economy:
+    simulation: {panel_size_default: 200, rounds: 1}
+    multi_run: 1
+    models:
+      amplifier: economy_structured
+      persona_generator: economy
+      response_generator: economy
+      narrative: pro
+      executive_judge: pro
+      qa_reviewer: economy_structured
+
+  pro:
+    simulation: {panel_size_default: 800, rounds: 1}
+    multi_run: 3
+    models:
+      amplifier: pro
+      persona_generator: pro
+      response_generator: pro
+      narrative: pro
+      executive_judge: premium
+      qa_reviewer: pro
+
+  premium:
+    simulation: {panel_size_default: 1500, rounds: 1}
+    multi_run: 5
+    models:
+      amplifier: premium
+      persona_generator: pro
+      response_generator: pro
+      narrative: premium
+      executive_judge: ultra
+      qa_reviewer: premium
+
+  ultra:
+    simulation: {panel_size_default: 2000, rounds: 1}
+    multi_run: 10
+    models:
+      amplifier: ultra
+      persona_generator: premium
+      response_generator: premium
+      narrative: ultra
+      executive_judge: ultra
+      qa_reviewer: ultra
+    features_unlocked:
+      - multi_modal_stimulus_package_image
+      - multi_language_panel
+      - regional_subpanel_comparison
+
+limits:
+  - "Intent-to-buy simulated ≠ actual purchase — gap típico 20-40% depending on category"
+  - "No captura efecto competitivo dinámico (precio rival podría cambiar en response)"
+  - "No mide repeat purchase ni LTV — solo first-buy"
+  - "No incluye channel dynamics: retailer margin, shelf placement, promotional stacking"
+  - "Price elasticity estimada es direccional, no absoluta"
+  - "Impulse purchase modeling aproximado — real impulse drivers (mood, timing) no capturados"
+  - "Cultural price anchors regionales pueden requerir test per geography"
+
+cross_test_learning:
+  patterns_to_extract:
+    count_per_test: "5-10"
+    examples:
+      - "price_point_sweet_spot_drift_over_launches"
+      - "segment_price_sensitivity_stable_or_shifting"
+      - "packaging_premium_worth_impact"
+      - "bundle_vs_single_preference"
+      - "aspirational_buyer_threshold"
+  priors_relevance:
+    window: "tests_same_client_same_category_last_12_months"
+    max_priors_injected: 8
+
+pricing_recommendation:
+  default_tier: pro
+  notes: "Pricing_test de SKU nueva suele ir con Pro. Economy para exploratorio, Premium para strategic re-pricing, Ultra para flagship launch."
+  upgrade_triggers:
+    - {trigger: "product_launch_budget > 10M_usd OR first_of_line", suggest: premium}
+    - {trigger: "flagship_product OR global_launch", suggest: ultra}
+  downgrade_acceptable:
+    - {trigger: "SKU_minor OR exploratory_concept_stage", suggest: economy}
+
+prompts:
+  intake_schema: "prompts/pricing_test/intake.yaml"
+  amplifier: "prompts/pricing_test/amplifier.yaml"
+  entity_extractor: "prompts/pricing_test/entity_extractor.yaml"
+  persona_generator: "prompts/pricing_test/persona.yaml"
+  survey_questions: "prompts/pricing_test/survey_questions.yaml"
+  response_generator: "prompts/pricing_test/response.yaml"
+  narrative_per_variant: "prompts/pricing_test/narrative.yaml"
+  executive_judge: "prompts/pricing_test/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/pricing_test/qa_reviewer.yaml"
+  pattern_extractor: "prompts/pricing_test/pattern_extractor.yaml"

@@ -1,0 +1,47 @@
+# Sharpz V2 dev stack
+# Usage: cd backend && docker compose up
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sharpz_postgres
+    environment:
+      POSTGRES_USER: sharpz
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sharpz_dev}
+      POSTGRES_DB: sharpz
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sharpz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: sharpz_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Backend corre on host directly via uv / uvicorn en dev
+  # (no containerizado para iteración más rápida en WSL2)
+  # En producción (v1+) agregamos service backend acá.
+
+volumes:
+  postgres_data:
+  redis_data:
+
+# For v1+ prod setup, add:
+# - backend service
+# - reverse proxy (caddy/traefik)
+# - monitoring (prometheus + grafana)

@@ -1,0 +1,335 @@
+# dna: investor_pitch
+# Version: 1.0.0
+# Schema reference: docs/dna-spec.md
+
+test_type: investor_pitch
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Validar si un pitch deck está listo para roadshow LP antes de gastar tiempo,
+    reputación y momentum con primeros meetings.
+  decision_question: >
+    ¿Salir a roadshow formal con este deck, o volver al drawing board?
+  buyer_profile:
+    - "Fundador o GP de fondo que está por levantar $10M-$1B"
+    - "Head of IR / capital formation en fondo establecido"
+    - "Consultora de placement agent advising GPs pre-roadshow"
+  typical_trigger: >
+    Pre-roadshow LP, 2-6 semanas antes de primeras reuniones formales, deck
+    en versión casi-final pero antes de presentarlo a IC de LPs reales.
+  decision_outputs: [GO, CONDITIONAL_GO, DELAY_AND_FIX, NO_GO]
+
+panel:
+  anchors_spec:
+    count: {min: 6, max: 10, recommended: 8}
+    field_schema_ref: "prompts/investor_pitch/intake.yaml#anchors"
+    examples:
+      - "LP institucional — agri specialist (tipo TIAA/Nuveen)"
+      - "LP sovereign wealth — food security mandate"
+      - "Family office — Argentino/LatAm"
+      - "US Endowment / foundation allocator"
+      - "Agri PE GP emeritus (ex-operador sector)"
+      - "LatAm-skeptic US HNW investor"
+      - "Brazilian agri family office"
+      - "Impact / ESG allocator"
+      - "European pension fund real assets"
+      - "DFI (IFC/IDB Invest/FMO)"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: law_firm, count: "3-5", rationale: "Advisors DD del deal (top firms jurisdicción + deal counsel)"}
+      - {type: media_trade, count: "3-5", rationale: "Agri Investor, PEI, Institutional Investor, regional press"}
+      - {type: comparable_company, count: "5-8", rationale: "Competitors citables (ej. Adecoagro, SLC Agrícola, Cresud para agri AR)"}
+      - {type: regulator, count: "1-3", rationale: "CNV/SEC/jurisdicción del deal + industry regulator"}
+      - {type: placement_agent, count: "0-2", rationale: "Si el deal se hace via placement agent, relevante"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 48
+    per_anchor_cap: [2, 15]
+    formula: "M = round(target_pool / K)"
+
+  composition_targets:
+    primary_panel_pct: {min: 50, max: 60}
+    ecosystem_pct: {min: 15, max: 25}
+    context_pct: {min: 20, max: 30}
+
+  exclude_entity_types:
+    - ConsumerBrand
+    - RetailCustomer
+    - IndividualInvestorRetail
+    - InfluencerSocialMedia
+    - CelebrityEndorser
+
+  quality_requirements:
+    bio_length_min_words: 300
+    bio_length_target_words: 450
+    persona_realism_score_min: 0.7
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 48, min: 32, max: 80}
+  duration:
+    simulated_time: "pitch_meeting_day + 7d_followup"
+    wall_clock_target_minutes: 12
+  rounds:
+    min: 15
+    default: 20
+    max: 30
+    delivery_round: 1
+    interview_cutoff_round: 20
+  propagation:
+    type: venue_rules
+    cross_agent_visibility: controlled
+    info_decay: round_by_round
+
+setting:
+  category: in_person_meeting
+  description: >
+    Sala de reunión profesional. GP presenta deck frente a IC del LP (3-5 LP,
+    1-2 GP). Duración 60-90 min. Post-meeting: IC memos internos circulan
+    dentro del LP + follow-up privado GP ↔ LP vía email/DM.
+  message_tone_defaults:
+    formality: high
+    technical_density: high
+    emotion_expression: low
+    hedging_norm: moderate
+  non_verbal_signals_accepted: true
+  latency_between_turns: short
+  remote_variant_allowed: true
+
+venue:
+  reference: "venues/pitch_meeting.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste]
+  formats_rejected_with_message:
+    video: "investor_pitch acepta video del GP pitch solo en tier Ultra (v1+)"
+    image: "imágenes solo como complemento del PDF del deck"
+  required_fields:
+    - pitch_deck_file           # PDF del deck completo
+    - check_size_target         # rango del ticket que buscan
+    - raise_total_target        # target del fund
+    - fund_thesis_one_paragraph # thesis en 1 párrafo
+  optional_fields:
+    - track_record_attached
+    - team_bios_extended
+    - market_research_attached
+    - legal_structure_summary
+    - geographic_focus
+  delivery_format:
+    round_1_content: "GP presenta deck + statement de apertura (inferido del brief si no provisto)"
+    max_pages_panel_sees: 30
+    extraction_method: vision_llm_plus_text  # Claude Sonnet con vision para extraer charts/tables
+
+metrics:
+  primary:
+    - follow_up_meeting_intent_pct
+    - check_size_floated_distribution
+    - red_flags_ranked
+    - term_sheet_likelihood_by_segment
+    - ask_clarity_score
+  secondary:
+    - competitive_benchmark_mentions
+    - geographic_comfort_gap
+    - esg_sensitivity_distribution
+    - operational_skepticism_level
+    - fee_transparency_concern_level
+  never_emphasize:
+    - raw_sentiment_score
+    - viral_coefficient
+    - boycott_probability
+  aggregation_rules:
+    follow_up_meeting_intent_pct:
+      computation: "% of LPs that signaled yes to follow-up meeting"
+      confidence: "bootstrap 1000, 90% CI"
+      breakdown_by: [archetype, geography, check_size_bucket]
+
+report:
+  required_sections:
+    - executive_summary
+    - context_of_experiment
+    - reaction_by_segment
+    - variant_ranking
+    - red_flags
+    - strongest_elements
+    - actionable_recommendations
+    - what_to_monitor
+    - honest_caveats
+    - appendices
+  optional_sections:
+    - lp_quotes_deep_dive
+  unique_sections:
+    - ideal_investor_profile_reverse_engineered
+    - re_pitch_per_segment_recommendations
+  length_target: {min_words: 5000, target_words: 6500}
+  quote_requirements:
+    min_validated: 15
+    validation_method: embedding_similarity_or_rapidfuzz
+    threshold_embedding: 0.85
+    threshold_rapidfuzz: 90
+  language_policy:
+    default: match_intake_locale
+    quotes_preserve_original: true
+
+one_pager:
+  structure: SHARED_V1
+  length: {min_words: 400, max_words: 600}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - {name: phantom_entities, method: "llm + local_ner + pattern_filter", auto_fix: remove_on_high_confidence, budget_usd: 0.15}
+      - {name: off_target_archetype, method: llm_archetype_match, auto_fix: regenerate_variant}
+      - {name: law_firm_plausibility, method: llm_jurisdiction_check, auto_fix: remove, escalate_on: "> 20% flagged"}
+      - {name: geographic_specificity, method: llm, auto_fix: warn}
+      - {name: check_size_range_sanity, method: programmatic, auto_fix: flag}
+      - {name: ecosystem_balance, method: count_vs_spec, auto_fix: request_regen}
+      - {name: duplicates_encoding, method: local_dedup, auto_fix: always}
+    halt_threshold:
+      total_issues_for_halt_alert: 5
+      critical_issue_types: [phantom_above_10pct, ecosystem_balance_violated]
+
+  post_stage_4:
+    checks:
+      - {name: persona_coherence, scope: "20% sample + high-activity 100%"}
+      - {name: factual_hallucination, critical_flag: invented_law_or_citation}
+      - {name: competitor_coherence, escalate_on: "competidor aparece apoyando activamente al fund raising"}
+      - {name: dd_question_depth, target: "institutional tone, not retail"}
+      - {name: ic_memo_institutional_tone, target: "formal memorandum, not blog post"}
+      - {name: no_public_leakage, escalate_on: "any 'tweet' about the confidential pitch"}
+      - {name: gp_response_consistency, target: "GP responses match brief, no contradictions"}
+      - {name: language_drift, escalate_on: "> 5% off-locale"}
+      - {name: copy_propagation, threshold: 0.92}
+      - {name: on_topic, threshold: 0.35}
+      - {name: dominance, threshold: 0.30}
+
+  post_stage_6:
+    checks:
+      - {name: quote_validation, critical: true, threshold_embedding: 0.85}
+      - {name: exaggeration, method: compare_narrative_tone_vs_sim_raw}
+      - {name: agent_attribution, method: llm_verify_quote_agent_mapping}
+      - {name: lp_named_variety, target: "report cites varied LPs, not just 1-2"}
+
+  post_stage_7:
+    checks:
+      - {name: winner_confidence_calibration, critical: true}
+      - {name: caveat_erosion, method: llm_check_vs_known_limits}
+      - {name: optimism_bias, method: llm_flag_everything_is_great_when_data_says_otherwise}
+      - {name: structural_compliance, method: regex_check_required_sections}
+      - {name: dd_quote_authenticity, method: sim_log_match}
+
+  anti_bias_invariants:
+    - "QA no modifica opiniones del panel — solo coherencia y factualidad"
+    - "Un LP bearish legítimo no se hace artificialmente balanced"
+    - "Toda corrección se loguea con razón en event log"
+    - "Reporte final menciona: N correcciones aplicadas (sin detalles filtrables)"
+
+tier_overrides:
+  economy:
+    simulation: {panel_size_default: 32, rounds_default: 15}
+    multi_run: 1
+    models:
+      amplifier: economy_structured
+      persona_generator: economy
+      sim_agent_action: economy
+      interview: economy
+      narrative: pro
+      executive_judge: pro
+      qa_reviewer: economy_structured
+
+  pro:
+    simulation: {panel_size_default: 48, rounds_default: 20}
+    multi_run: 3
+    models:
+      amplifier: pro
+      persona_generator: pro
+      sim_agent_action: pro
+      interview: pro
+      narrative: pro
+      executive_judge: premium
+      qa_reviewer: pro
+
+  premium:
+    simulation: {panel_size_default: 64, rounds_default: 25}
+    multi_run: 5
+    models:
+      amplifier: premium
+      persona_generator: premium
+      sim_agent_action: pro
+      interview: premium
+      narrative: premium
+      executive_judge: ultra
+      qa_reviewer: premium
+
+  ultra:
+    simulation: {panel_size_default: 80, rounds_default: 30}
+    multi_run: 10
+    models:
+      amplifier: ultra
+      persona_generator: ultra
+      sim_agent_action: premium
+      interview: ultra
+      narrative: ultra
+      executive_judge: ultra
+      qa_reviewer: ultra
+    features_unlocked:
+      - multi_modal_stimulus_video_audio
+      - multi_language_panel
+      - agent_memory_across_tests
+      - live_operator_intervention
+
+limits:
+  - "NO puede predecir si el raise cierra — depende de condiciones macro fuera del panel"
+  - "NO evalúa competencia simultánea (otro fondo raising al mismo tiempo con ventaja coordinada)"
+  - "Panel no captura chemistry del GP en vivo ni storytelling skill"
+  - "Posiciones internas actuales de LPs reales pueden diferir de mandato público"
+  - "No sustituye DD legal, fiscal, o background checks del GP"
+  - "Track record extrapolation del deck es approximate — los LPs reales hacen deeper DD"
+  - "Reference calls post-meeting (calls a LPs pasados del GP) no modeladas"
+
+cross_test_learning:
+  patterns_to_extract:
+    count_per_test: "5-10"
+    examples:
+      - "fee_transparency_sensitivity"
+      - "geographic_preference_pattern_vs_fund_focus"
+      - "track_record_threshold_implicit_by_segment"
+      - "esg_score_tolerance"
+      - "alignment_co_gp_alignment_concerns"
+  priors_relevance:
+    window: "tests_same_client_same_test_type_last_12_months"
+    max_priors_injected: 8
+  scoping_rules:
+    strict: "priors NEVER cross test_type boundaries"
+    strict: "priors NEVER cross client boundaries (unless explicit benchmark opt-in)"
+
+pricing_recommendation:
+  default_tier: pro
+  notes: "Investor_pitch de fondos medianos (PE/VC standard) va con Pro. Premium para first-time-raise o institutional-focus. Ultra reservado para board-level."
+  upgrade_triggers:
+    - {trigger: "raise_total_target > 100M_usd", suggest: premium}
+    - {trigger: "raise_total_target > 500M_usd OR first_institutional_raise", suggest: ultra}
+    - {trigger: "pitch_to_sovereign_wealth_as_anchor", suggest: ultra}
+  downgrade_acceptable:
+    - {trigger: "raise_total_target < 10M_usd AND exploratory_pre_roadshow", suggest: economy}
+
+prompts:
+  intake_schema: "prompts/investor_pitch/intake.yaml"
+  amplifier: "prompts/investor_pitch/amplifier.yaml"
+  entity_extractor: "prompts/investor_pitch/entity_extractor.yaml"
+  persona_generator: "prompts/investor_pitch/persona.yaml"
+  stimulus_delivery: "prompts/investor_pitch/stimulus_delivery.yaml"
+  agent_action_dd_question: "prompts/investor_pitch/action_dd_question.yaml"
+  agent_action_ic_memo: "prompts/investor_pitch/action_ic_memo.yaml"
+  agent_action_dm: "prompts/investor_pitch/action_dm.yaml"
+  interview: "prompts/investor_pitch/interview.yaml"
+  narrative_per_variant: "prompts/investor_pitch/narrative.yaml"
+  executive_judge: "prompts/investor_pitch/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/investor_pitch/qa_reviewer.yaml"
+  pattern_extractor: "prompts/investor_pitch/pattern_extractor.yaml"
