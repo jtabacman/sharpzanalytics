@@ -6,26 +6,41 @@
 
 ```
 sharpzanalytics/
-├── backend/           # FastAPI app + pipeline engine (Python 3.12 + uv)
-├── dna/               # test_type YAMLs — 1 archivo por test_type
-├── venues/            # interaction surface YAMLs — 1 archivo por venue
-├── prompts/           # prompts YAML (port de MiroFish 75 YAMLs)
-│   ├── shared/        # prompts compartidos (one_pager, qa_reviewer_base)
-│   └── <test_type>/   # prompts específicos per test_type
-├── docs/              # documentación arquitectónica
-├── scripts/           # dev tooling, data migrations, ops helpers
-├── tests/             # pytest suite
-└── migrations/        # alembic DB migrations
+├── backend/              # FastAPI app + pipeline engine (Python 3.12 + uv)
+├── frontends/            # 4 superficies del producto
+│   ├── landing/          # sharpzanalytics.com — HTML static + Three.js
+│   ├── intake/           # /intake/{id} — Vue 3 SPA
+│   ├── control/          # control.sharpzanalytics.com — admin Vue SPA
+│   └── deliverable-template/  # /report/{project_id} — Jinja2 serif report
+├── dna/                  # test_type YAMLs — 1 archivo por test_type
+├── venues/               # interaction surface YAMLs — 1 archivo por venue
+├── prompts/              # prompts YAML (port de MiroFish 75 YAMLs)
+│   ├── shared/           # prompts compartidos (one_pager, qa_reviewer_base)
+│   └── <test_type>/      # prompts específicos per test_type
+├── docs/                 # documentación arquitectónica
+│   ├── dna-spec.md              # contrato declarativo central
+│   ├── frontend-architecture.md # URLs unificadas + DNS + hosting
+│   ├── intake-api-contract.md   # contrato backend ↔ intake SPA
+│   ├── landing-design.md        # referencia: landing Three.js + CSS
+│   ├── intake-design.md         # referencia: tokens + intake Vue + componentes
+│   └── repo-structure.md        # este archivo
+├── scripts/              # dev tooling, data migrations, ops helpers
+├── tests/                # pytest suite
+└── migrations/           # alembic DB migrations
 ```
 
-## Qué vive fuera de este repo
+## Decisión: monorepo unificado
+
+Los 4 frontends + backend viven en **este** repo. Los deploys siguen siendo independientes (Netlify para landing, Vercel para control, backend solo para intake + deliverable). El código junto evita drift de contratos.
+
+## Qué vive fuera del repo (pero forma parte del producto)
 
 | Asset | Ubicación | Notas |
 |---|---|---|
-| Landing (`sharpzanalytics.com`) | Netlify | Static HTML, repo propio |
-| Intake form (`intake.sharpzanalytics.com`) | Vercel, `sharpz-intake` project | Vue SPA + Python serverless en `api/`, Vercel KV (Redis) |
-| Admin panel | Offline actualmente | Vue, pendiente re-deploy |
-| MiroFish (prototipo anterior) | Mac de Julian | Fuente de 75 YAMLs de prompts portables |
+| DNS zone de `sharpzanalytics.com` | Hostinger | A records + CNAMEs apuntan a Netlify / Vercel / backend |
+| Deploy Netlify (landing actual) | Netlify dashboard | Pendiente vincular a `frontends/landing/` de este repo |
+| Deploy Vercel intake actual | Vercel (`sharpz-intake` project) | Deprecar cuando `/intake/{id}` del backend esté listo |
+| MiroFish (prototipo anterior) | Mac de Julian (`/Users/juliantabacman/MiroFish/`) | Fuente de 75 YAMLs de prompts + código de `intake-public/` y `frontend/` para importar |
 | Business brief | Local de Julian (`sharpz_business_brief.md`) | Contexto producto |
 
 ## Convenciones
