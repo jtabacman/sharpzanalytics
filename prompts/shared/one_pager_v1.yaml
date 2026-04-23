@@ -1,0 +1,79 @@
+# shared prompt: one_pager_v1
+# Consumido por: stage 7 (executive judge second pass) de TODOS los test_types
+# Spec: structured 5-section one-pager de 400-600 words
+
+id: one_pager_v1
+version: "1.0.0"
+purpose: >
+  Condensar el reporte ejecutivo largo (5000+ palabras) a un one-pager de 400-600
+  palabras con estructura FIJA de 5 secciones. Target: CEO que tiene 2 minutos
+  entre meeting y meeting y decide GO basado en esto.
+
+model_tier: pro  # modelo económico con instruction following alto (claude-haiku tier)
+
+inputs:
+  - executive_report_full_md   # output de stage 7 pass 1
+  - test_type
+  - variants_with_names
+  - winner_variant
+  - winner_confidence  # 0-100
+  - decision_options   # GO / CONDITIONAL_GO / DELAY_AND_FIX / NO_GO (+ test-specific)
+  - locale             # es | en | otro
+
+system_prompt: |
+  Sos un analista executive-facing. Tu trabajo es condensar reportes largos en
+  one-pagers de decisión para CEOs que tienen 2 minutos.
+
+  REGLAS NO NEGOCIABLES:
+  1. Exactamente 5 secciones con los headers exactos:
+     - "## Decisión: [DECISION_LABEL]"
+     - "## Top 3 insights"
+     - "## 3 acciones para el lunes 9am"
+     - "## Qué mirar la próxima semana"
+     - "## Caveats honestos"
+  2. Total 400-600 palabras. Preferible 500.
+  3. NO marketing-speak. Sin palabras: "unlock", "synergy", "ecosystem", "journey", "ideation".
+  4. Decisión sin hedging vacío. Si winner_confidence < 60, usá hedging concreto
+     ("señal preliminar apunta a X, necesita más evidencia"); si > 80 directo
+     ("Recomiendo X").
+  5. Cada insight ≤ 25 palabras + número + observación + qué significa.
+  6. Cada acción: verbo + objeto concreto + métrica medible.
+  7. "Qué mirar" tiene umbrales concretos ("si lift < 10pt semana 4 → pausar").
+  8. Caveats: 1-2 limitaciones reales del test, no genéricas.
+
+user_prompt_template: |
+  Test type: {test_type}
+  Winner variant: {winner_variant.name} (variant_id: {winner_variant.variant_id})
+  Winner confidence: {winner_confidence}/100
+  Decision options válidas: {decision_options}
+  Locale output: {locale}
+
+  Reporte ejecutivo completo (para condensar):
+  ---
+  {executive_report_full_md}
+  ---
+
+  Generá el one-pager con la estructura fija de 5 secciones. Respondé SOLO el
+  markdown del one-pager, sin preámbulo.
+
+output_format: markdown
+output_schema_check:
+  required_h2_headers:
+    - "Decisión:"
+    - "Top 3 insights"
+    - "3 acciones para el lunes 9am"
+    - "Qué mirar la próxima semana"
+    - "Caveats honestos"
+  length: {min_words: 400, max_words: 600, target_words: 500}
+
+qa_hints:
+  - decision_header_format_strict  # regex: "## Decisión: [A-Z_]+"
+  - three_insights_exactly
+  - three_actions_exactly
+  - word_count_in_range
+  - no_marketing_words_blocklist
+
+notes:
+  - "Este prompt es SHARED entre los 15 test_types. No customizar per test_type."
+  - "Si un test_type necesita estructura distinta, probablemente esté mal — hablar con producto."
+  - "El prompt de pass 1 (executive_judge) es per-test_type, este de pass 2 (condensar) NO."

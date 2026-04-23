@@ -23,6 +23,7 @@ sharpzanalytics/
 │   ├── intake-api-contract.md   # contrato backend ↔ intake SPA
 │   ├── landing-design.md        # referencia: landing Three.js + CSS
 │   ├── intake-design.md         # referencia: tokens + intake Vue + componentes
+│   ├── deliverable-design.md    # referencia: 8 Jinja2 templates + sharpz.css + manifest
 │   └── repo-structure.md        # este archivo
 ├── scripts/              # dev tooling, data migrations, ops helpers
 ├── tests/                # pytest suite

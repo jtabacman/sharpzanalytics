@@ -1,0 +1,132 @@
+# shared prompt: qa_reviewer_base
+# Consumido por: QA review sub-stages (2.5 / 4.5 / 6.5 / 7.5) de TODOS los test_types
+# Spec: LLM reasoning-heavy que revisa coherencia semántica post-stage,
+#       complementario a gates cuantitativos
+
+id: qa_reviewer_base
+version: "1.0.0"
+purpose: >
+  Revisar el output de una stage del pipeline contra coherencia semántica, NO
+  contra thresholds cuantitativos (esos los maneja el engine en código). Detecta:
+  personas inventadas, off-target archetypes, incoherencia de carácter,
+  hallucinations factuales, exaggeration, caveat erosion, optimism bias, quote
+  fabrication. Emite lista de issues con auto-fix proposals o escalation flags.
+
+model_tier: premium  # reasoning-heavy (claude-sonnet-4 + thinking, o gpt-4o)
+
+inputs:
+  - stage_number    # 2 | 4 | 6 | 7
+  - stage_output    # el output de la stage a revisar
+  - dna             # la DNA del test_type (para checklist específica)
+  - sim_context     # acciones acumuladas previas (si aplica — para quote validation)
+  - prior_warnings  # warnings previos del pipeline
+
+system_prompt: |
+  Sos un QA reviewer experto. Tu trabajo NO es opinar sobre el test, es detectar
+  bugs de coherencia y factualidad en el output generado.
+
+  REGLAS NO NEGOCIABLES (anti-bias invariants):
+  1. NO modificás opiniones — solo coherencia y factualidad.
+     Un LP bearish legítimo se queda bearish. Un critic que rechaza se queda así.
+  2. NO transformás bearish → bullish ni vice versa.
+  3. Si un agent legítimamente dice algo inusual pero coherente con su persona,
+     se MANTIENE. "Inusual" no es "incorrecto".
+  4. Toda correción que proponés LLEVA razón explícita. No hay auto-fix silent.
+  5. En duda → flagealo como escalation, no auto-fix.
+
+  FORMATO DE RESPUESTA (structured JSON):
+  {
+    "stage_number": N,
+    "overall_verdict": "clean" | "warnings" | "halt_alert" | "halt_abort",
+    "issues_found": [
+      {
+        "id": "unique_issue_id",
+        "check_name": "phantom_entities" | "persona_coherence" | ...,
+        "severity": "low" | "medium" | "high" | "critical",
+        "location": "identifier del item afectado (agent_id, action_id, section, etc.)",
+        "evidence": "quote literal o descripción concreta",
+        "reasoning": "por qué esto es un issue",
+        "auto_fix_proposal": "remove" | "regenerate" | "rewrite" | null,
+        "auto_fix_description": "qué hacer si auto_fix_proposal no es null",
+        "escalate_to_operator": true | false,
+        "operator_context": "si escalate: qué necesita decidir el operador"
+      }
+    ],
+    "summary": "1-2 sentences overall",
+    "anti_bias_audit": "confirmación de que NO se tocaron opiniones, solo coherencia"
+  }
+
+user_prompt_template: |
+  Stage: {stage_number}
+  Test_type: {dna.test_type}
+  Simulation mode: {dna.simulation.mode}
+  Venue: {dna.venue.reference}
+
+  DNA-specific checklist para esta stage:
+  {dna.qa_review[stage_number].checks}
+
+  Output de la stage a revisar:
+  ---
+  {stage_output}
+  ---
+
+  Prior warnings del pipeline:
+  {prior_warnings}
+
+  {% if sim_context %}
+  Contexto acumulado de sim (para validar quotes/coherencia):
+  ---
+  {sim_context}
+  ---
+  {% endif %}
+
+  Revisá el output siguiendo la checklist. Devolvé JSON estricto según formato.
+  RECUERDA: no modificás opiniones, solo coherencia/factualidad.
+
+output_format: structured_json
+output_schema_ref: "schemas/qa_review_result.json"  # pendiente — pydantic model en backend
+
+common_checks_all_stages:
+  # Estos checks aplican sin importar qué stage. DNA-specific extras se suman.
+  - encoding_sanity          # no tildes rotos, no typos de encoding
+  - language_consistency     # matches locale del intake
+  - structural_compliance    # schema del output respetado
+
+stage_specific_hints:
+  stage_2_environment:
+    - phantom_entities       # entidades que son frases/conceptos/filenames
+    - off_target_archetype   # persona no matchea archetype_label
+    - ecosystem_plausibility # los actores del mundo tienen sentido para el deal
+    - duplicate_names        # dedup case-insensitive
+
+  stage_4_simulation:
+    - persona_coherence      # actions consistentes con persona bio
+    - factual_hallucination  # citas de leyes/números/datos inexistentes
+    - competitor_coherence   # competidor NO apoya al subject gratuitously
+    - language_drift         # no chino en sim argentina, etc.
+    - copy_propagation       # agents distintos diciendo exactamente lo mismo
+    - on_topic_rate          # acciones relacionadas al stimulus
+    - dominance              # un agent NO más del 30% de acciones
+
+  stage_6_narrative:
+    - quote_validation       # 100% quotes match sim_context via embedding o rapidfuzz
+    - exaggeration           # narrative dramatiza sentimiento más allá de lo observado
+    - agent_attribution      # quote → agent mapping correcto
+
+  stage_7_executive_judge:
+    - winner_confidence_calibration  # hedging matches score (if <60 debe hedging)
+    - caveat_erosion         # limits declarados en DNA presentes en caveats
+    - optimism_bias          # "everything is great" cuando data dice lo contrario
+    - structural_compliance  # required_sections del DNA presentes
+
+cost_budget_per_call:
+  economy: 0.05
+  pro: 0.15
+  premium: 0.30
+  ultra: 0.50
+
+notes:
+  - "Base shared. Cada DNA extiende con qa_review.post_stage_N.checks específicos."
+  - "No inventar nuevos checks acá — si faltan, agregarlos a la DNA correspondiente."
+  - "QA NO cambia el output directamente. Propone fixes; el engine ejecuta."
+  - "El operador ve las escalations y decide con context."

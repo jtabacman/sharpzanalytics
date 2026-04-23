@@ -39,22 +39,24 @@ Ver `docs/frontend-architecture.md` para DNS + routing.
 | `docs/intake-api-contract.md` | Shape del payload intake ↔ backend (fuente de verdad) |
 | `docs/landing-design.md` | Referencia del landing actual (HTML + CSS + Three.js) |
 | `docs/intake-design.md` | Referencia del intake actual (tokens + Vue + componentes) |
+| `docs/deliverable-design.md` | Referencia del deliverable (8 Jinja2 templates + sharpz.css + manifest schema) |
+| `docs/roadmap.md` | Milestones m0-m5+ con deliverables y criterios de done |
 | `docs/repo-structure.md` | Convenciones de repo, commits, naming |
 
 ## Status
 
-- `docs/dna-spec.md` v0.2 — decisiones resueltas
-- `docs/frontend-architecture.md` v0.1 — pendiente confirmar prefijo `/report/`
-- `docs/intake-api-contract.md` v0.1 — listo para implementar
-- Backend engine: **no iniciado**
-- Frontends: **pendientes de port** desde Mac (landing Netlify + intake Vercel + admin Vue offline)
-- Next: venues catalog + 3 DNA YAMLs concretos + skeleton FastAPI + Stage 1
+- **m0 docs arquitectónicos:** ✓ completos (7 docs)
+- **venues/:** ✓ 13/13 YAMLs
+- **dna/:** ✓ 3/15 activos (investor_pitch, pricing_test, crisis_response). 12 pending m2.
+- **backend/:** skeleton runnable — `/health` endpoint OK. Stage 1 en curso.
+- **frontends/:** READMEs + import plans. Código pendiente port desde Mac.
+- **Next:** Alembic init + shared prompts placeholders + Stage 1 (Intake API)
 
 ## Estado de milestones
 
 | Milestone | Target | Status |
 |---|---|---|
-| m0: DNA spec + venues + frontends arch + repo structure | semana 1 | 🟡 in progress |
-| m1: investor_pitch end-to-end vs MiroFish (caso Invernea) | semana 3 | pending |
+| m0: docs arquitectónicos + venues + 3 DNAs activos + backend skeleton | semana 1 | ✓ **done** |
+| m1: investor_pitch end-to-end vs MiroFish (caso Invernea) | semana 3 | 🟡 in progress |
 | m2: los 15 test_types + 4 tiers + cross-test learning básico | mes 2-3 | pending |
 | m3: multi-tenant + self-serve + billing | mes 4-6 | pending |
