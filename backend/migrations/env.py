@@ -11,9 +11,8 @@ from sqlmodel import SQLModel
 
 from sharpz.config import settings
 
-# Import all models so SQLModel.metadata knows them.
-# Models module will be populated in m1 — for now this is a placeholder.
-# When models exist: `from sharpz import models  # noqa: F401`
+# Import all models so SQLModel.metadata knows them at autogenerate time.
+from sharpz import models  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

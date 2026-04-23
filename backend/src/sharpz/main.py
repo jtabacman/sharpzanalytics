@@ -8,14 +8,22 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from sharpz import __version__
+from sharpz.api import intakes_router, operator_router
 from sharpz.config import settings
+from sharpz.dna import list_active_test_types
 
 logger = structlog.get_logger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    logger.info("starting", version=__version__, env=settings.env)
+    active = list_active_test_types()
+    logger.info(
+        "starting",
+        version=__version__,
+        env=settings.env,
+        active_test_types=active,
+    )
     yield
     logger.info("shutting down")
 
@@ -37,10 +45,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(intakes_router)
+app.include_router(operator_router)
+
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok", "version": __version__, "env": settings.env}
+async def health() -> dict[str, str | list[str]]:
+    return {
+        "status": "ok",
+        "version": __version__,
+        "env": settings.env,
+        "active_test_types": list_active_test_types(),
+    }
 
 
 @app.get("/")
