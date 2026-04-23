@@ -4,17 +4,34 @@ import pytest
 
 from sharpz.dna import DNALoadError, get_dna, list_active_test_types, load_all_dnas
 
+EXPECTED_ACTIVE_TEST_TYPES = {
+    "investor_pitch",
+    "pricing_test",
+    "crisis_response",
+    "creative_test",
+    "narrative_framing",
+    "brand_sentiment_shift",
+    "competitive_response",
+    "controversial_launch",
+    "product_launch",
+    "campaign_planning",
+    "churn_analysis",
+    "electoral_sentiment",
+    "policy_rollout",
+    "audience_targeting",
+    "b2b_pricing",
+}
 
-def test_load_all_dnas_finds_the_three_active():
+
+def test_load_all_dnas_finds_all_fifteen():
     dnas = load_all_dnas()
-    assert "investor_pitch" in dnas
-    assert "pricing_test" in dnas
-    assert "crisis_response" in dnas
+    assert set(dnas.keys()) == EXPECTED_ACTIVE_TEST_TYPES
+    assert len(dnas) == 15
 
 
 def test_list_active_test_types_matches_yaml_status():
     active = list_active_test_types()
-    assert set(active) == {"investor_pitch", "pricing_test", "crisis_response"}
+    assert set(active) == EXPECTED_ACTIVE_TEST_TYPES
 
 
 def test_get_dna_unknown_raises():
