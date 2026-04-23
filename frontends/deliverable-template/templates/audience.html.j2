@@ -1,0 +1,146 @@
+{% extends "base.html.j2" %}
+
+{% block head_extra %}
+<script src="https://unpkg.com/cytoscape@3.26.0/dist/cytoscape.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">
+      Audiencia Sintética
+    </span>
+  </div>
+
+  <h1>La audiencia del experimento</h1>
+
+  <p style="font-size:20px;color:var(--gray-700);font-style:italic;margin-bottom:48px;">
+    El entorno controlado sobre el que se corrieron las variantes:
+    {{ agent_count }} agentes representativos ({{ entity_types_summary }}),
+    conectados por relaciones de influencia, rivalidad y cobertura mediática.
+  </p>
+
+  <div class="sharpz-callout">
+    <div class="sharpz-callout-title">Qué significa "audiencia sintética"</div>
+    Cada agente es una persona generada por IA con biografía específica: edad,
+    país, profesión, preferencias, rivalidades, consumos mediáticos. Durante la
+    simulación, cada uno actúa autónomamente en el venue según su perfil.
+    Al final del test, entrevistamos a los archetypes clave para insights cualitativos.
+  </div>
+
+  <h2>Grafo de la audiencia</h2>
+  <div class="sharpz-graph" id="sharpz-graph-container">
+    <div style="padding:32px;font-family:var(--font-ui);color:var(--gray-500);font-size:13px;">
+      Cargando visualización interactiva...
+    </div>
+  </div>
+  <p class="sharpz-graph-legend">
+    Cada nodo representa un agente. Los bordes muestran relaciones extraídas
+    por IA (influencia, competencia, cobertura, rivalidad). Arrastrá para explorar.
+  </p>
+
+  <h2>Composición de la audiencia</h2>
+  <table>
+    <thead>
+      <tr><th>Tipo</th><th>Cantidad</th><th>% del total</th></tr>
+    </thead>
+    <tbody>
+      {% for et, count in entity_type_breakdown %}
+      <tr>
+        <td>{{ et }}</td>
+        <td>{{ count }}</td>
+        <td>{{ "%.1f"|format(count / agent_count * 100) }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Los agentes</h2>
+  <p>Listado completo de los {{ agent_count }} agentes que participaron de la simulación.</p>
+
+  <div class="sharpz-agent-grid">
+    {% for agent in agents %}
+    <div class="sharpz-agent-card">
+      <span class="type-tag">{{ agent.entity_type }}</span>
+      <div class="name">{{ agent.entity_name }}</div>
+      {% if agent.username %}
+      <div class="handle">@{{ agent.username }}</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</article>
+
+<script>
+  (function () {
+    const graphData = {{ graph_data|tojson|safe }};
+    if (!graphData || !graphData.nodes || graphData.nodes.length === 0) return;
+
+    const container = document.getElementById('sharpz-graph-container');
+    container.innerHTML = '';
+
+    const elements = [];
+    for (const n of graphData.nodes) {
+      elements.push({
+        data: {
+          id: n.id,
+          label: n.name,
+          type: (n.labels || []).filter(l => l !== 'Entity')[0] || 'Person',
+        },
+      });
+    }
+    for (const e of (graphData.edges || [])) {
+      elements.push({
+        data: {
+          source: e.source || e.source_node,
+          target: e.target || e.target_node,
+          label: e.relation_type || e.name || '',
+        },
+      });
+    }
+
+    const colors = {
+      Executive:      '#B85C38',
+      GameDeveloper:  '#D97706',
+      Streamer:       '#1E40AF',
+      Journalist:     '#14532D',
+      TechReviewer:   '#166534',
+      Gamer:          '#4B5563',
+      Parent:         '#7C3AED',
+      Activist:       '#991B1B',
+      Person:         '#6B7280',
+      Organization:   '#0F172A',
+    };
+
+    cytoscape({
+      container,
+      elements,
+      style: [
+        { selector: 'node', style: {
+          'background-color': (ele) => colors[ele.data('type')] || '#6B7280',
+          'label': 'data(label)',
+          'color': '#0A0E27',
+          'font-family': 'Inter, sans-serif',
+          'font-size': '10px',
+          'text-valign': 'bottom',
+          'text-margin-y': 4,
+          'width': 14, 'height': 14,
+          'border-width': 1,
+          'border-color': '#FAF9F6',
+        }},
+        { selector: 'edge', style: {
+          'width': 1,
+          'line-color': '#E5E1D8',
+          'curve-style': 'bezier',
+          'target-arrow-shape': 'triangle',
+          'target-arrow-color': '#E5E1D8',
+          'arrow-scale': 0.7,
+        }},
+      ],
+      layout: { name: 'cose', animate: false, idealEdgeLength: 60, nodeRepulsion: 2500 },
+      minZoom: 0.3,
+      maxZoom: 3,
+    });
+  })();
+</script>
+{% endblock %}

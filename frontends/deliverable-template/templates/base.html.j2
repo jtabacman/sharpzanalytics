@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="{{ language|default('es') }}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{{ page_title|default(test.title) }} · Sharpz</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="{{ static_url('sharpz.css') }}">
+
+  {% if branding and branding.primary_color %}
+  <style>
+    :root { --sharpz-client-primary: {{ branding.primary_color }}; }
+    .sharpz-brand-tag             { color: var(--sharpz-client-primary); }
+    .sharpz-nav-item a.active     { border-left-color: var(--sharpz-client-primary); }
+    .sharpz-chip--winner          { background: var(--sharpz-client-primary); color: #fff; }
+    a                             { color: var(--sharpz-client-primary); }
+  </style>
+  {% endif %}
+
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="sharpz-viewer">
+  <div class="sharpz-layout">
+
+    <aside class="sharpz-sidebar">
+      {% if branding and branding.logo_url %}
+      <img src="{{ branding.logo_url }}"
+           alt="{{ deliverable.client_display_name or test.title }}"
+           class="sharpz-client-logo">
+      {% endif %}
+
+      <span class="sharpz-brand-tag">Sharpz Analytics</span>
+      <h1>{{ deliverable.client_display_name or test.title }}</h1>
+
+      <div class="sharpz-meta">
+        <strong>Test ID</strong>
+        <code>{{ test.test_id }}</code>
+
+        <strong>Tipo de test</strong>
+        {{ test.test_type_display_name }}
+
+        <strong>Generado</strong>
+        {{ generated_at_display }}
+
+        {% if test.total_cost_usd %}
+        <strong>Inversión en compute</strong>
+        ${{ "%.2f"|format(test.total_cost_usd) }} USD
+        {% endif %}
+      </div>
+
+      <ul class="sharpz-nav">
+        <li class="sharpz-nav-label">Contenido</li>
+        {% for item in sidebar_items %}
+        <li class="sharpz-nav-item">
+          <a href="{{ item.url }}" {% if item.slug == current_slug %}class="active"{% endif %}>
+            <span class="sharpz-nav-icon">{{ item.icon }}</span>
+            {{ item.title }}
+          </a>
+          {% if item.pdf_url %}
+          <a href="{{ item.pdf_url }}" class="sharpz-pdf-btn" download>↓ PDF</a>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+
+      <div class="sharpz-sidebar-footer">
+        Confidencial · solo para el destinatario.<br>
+        Sharpz Analytics — {{ generated_at_display }}
+      </div>
+    </aside>
+
+    <main class="sharpz-main">
+      <div class="sharpz-content">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+  </div>
+</body>
+</html>

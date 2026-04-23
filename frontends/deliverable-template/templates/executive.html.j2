@@ -1,0 +1,112 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<section class="sharpz-cover">
+  <span class="sharpz-cover-brand">
+    Reporte Ejecutivo · {{ test.test_type_display_name }}
+  </span>
+  <h1>{{ test.title }}</h1>
+  {% if test.objective %}
+  <p class="sharpz-subtitle">{{ test.objective }}</p>
+  {% endif %}
+  <div class="sharpz-cover-meta">
+    {% if deliverable.client_display_name %}
+    <div><strong>Cliente</strong><span>{{ deliverable.client_display_name }}</span></div>
+    {% endif %}
+    <div><strong>Tipo de test</strong><span>{{ test.test_type_display_name }}</span></div>
+    <div><strong>Variantes comparadas</strong><span>{{ variants|length }}</span></div>
+    <div><strong>Audiencia sintética</strong><span>{{ num_agents }} agentes</span></div>
+    <div><strong>Test ID</strong><span>{{ test.test_id }}</span></div>
+    <div><strong>Generado</strong><span>{{ generated_at_display }}</span></div>
+  </div>
+</section>
+
+<div class="sharpz-pdf-download" style="display:flex;justify-content:flex-end;margin:8px 0 16px;">
+  <a href="download/full.pdf" download class="sharpz-btn">
+    ⇣ Descargar deliverable completo (PDF)
+  </a>
+</div>
+
+<aside class="sharpz-methodology-disclosure" style="
+  margin:40px 0 32px;padding:20px 24px;background:#f9f7f2;
+  border-left:3px solid var(--accent-warm);border-radius:6px;
+  font-size:13px;line-height:1.6;color:var(--gray-700);">
+  <div style="font-size:11px;text-transform:uppercase;letter-spacing:0.1em;
+              color:var(--gray-500);margin-bottom:8px;font-weight:600;">
+    Cómo leer este reporte · 30 segundos
+  </div>
+  <p style="margin:0 0 8px;">
+    <strong>Este es un test de reacción sintética, no research estadístico.</strong>
+    {{ num_agents }} agentes generados por IA — calibrados por archetype —
+    consumieron cada variante en paralelo y reaccionaron de forma autónoma.
+    Las cifras, patrones y voces capturadas son <strong>señales relativas
+    entre variantes</strong>, no predicciones absolutas del mercado real.
+  </p>
+  <p style="margin:0 0 8px;">
+    El valor del reporte está en <strong>detectar qué variante funciona
+    mejor bajo las mismas condiciones</strong> y en <strong>iluminar tensiones
+    estratégicas antes del spend real</strong> — no en reemplazar paneles
+    cuantitativos o ventas piloto.
+  </p>
+  <p style="margin:0;">
+    Encontrarás tres tipos de afirmación diferenciados: <strong>Observación</strong>
+    (lo que pasó en la sim), <strong>Inferencia</strong> (razonamiento del
+    analista, marcado explícitamente), <strong>Recomendación</strong>
+    (acción ancla en observación + inferencia). Metodología completa en Apéndice D.
+  </p>
+</aside>
+
+<article class="sharpz-article">
+  {{ report_html|safe }}
+</article>
+
+{% if winner_variant %}
+<div class="sharpz-callout" style="margin-top:64px;">
+  <div class="sharpz-callout-title">Veredicto · variante recomendada</div>
+  <strong>{{ winner_variant.name }}</strong><br>
+  <span style="color:var(--gray-500);font-size:13px;">
+    variant_id: <code>{{ winner_variant.variant_id }}</code>
+  </span>
+
+  {% if test.winner_confidence is not none %}
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.08);">
+    <span style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;
+                 color:var(--gray-500);">
+      Confianza del veredicto
+    </span>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+      <strong style="font-size:24px;">{{ "%.0f"|format(test.winner_confidence) }}/100</strong>
+      <span class="sharpz-chip">{{ test.winner_confidence_label or '—' }}</span>
+    </div>
+    {% if test.winner_confidence_reasoning %}
+    <p style="font-size:12px;color:var(--gray-500);margin:8px 0 0 0;line-height:1.5;">
+      {{ test.winner_confidence_reasoning }}
+    </p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if quote_integrity and quote_integrity.total %}
+  <div style="margin-top:16px;padding-top:16px;border-top:1px solid rgba(0,0,0,0.08);">
+    <span style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;
+                 color:var(--gray-500);">
+      Integridad de quotes
+    </span>
+    <div style="display:flex;align-items:center;gap:12px;margin-top:6px;">
+      <strong style="font-size:18px;">
+        {{ quote_integrity.verbatim + quote_integrity.close_match }}/{{ quote_integrity.total }}
+      </strong>
+      <span class="sharpz-chip">{{ quote_integrity.verified_pct }}% verificadas</span>
+    </div>
+    <p style="font-size:12px;color:var(--gray-500);margin:8px 0 0 0;line-height:1.5;">
+      Quotes verbatim: {{ quote_integrity.verbatim }} ·
+      Paráfrasis cercanas (rapidfuzz): {{ quote_integrity.close_match }} ·
+      Match semántico (embeddings): {{ quote_integrity.semantic_match or 0 }} ·
+      Sin match: {{ quote_integrity.unverified }}.
+      Auditable en meta.json del reporte.
+    </p>
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">
+      Voces de los compradores
+    </span>
+  </div>
+
+  <h1>Entrevistas post-simulación</h1>
+
+  <p style="font-size:18px;color:var(--gray-700);font-style:italic;margin-bottom:48px;">
+    Al terminar cada variante, entrevistamos a los mismos {{ archetypes_count }} archetypes
+    representativos con {{ questions_count }} preguntas específicas del tipo de test.
+    Cada respuesta es el LLM actuando como ese agente, coherente con su biografía y
+    lo que vivió durante la simulación.
+  </p>
+
+  <div class="sharpz-callout">
+    <div class="sharpz-callout-title">Las {{ questions_count }} preguntas</div>
+    <ol style="margin:0;padding-left:20px;">
+      {% for q in questions %}<li>{{ q }}</li>{% endfor %}
+    </ol>
+  </div>
+
+  {% for variant in variants %}
+  <hr class="sharpz-section-divider">
+  <h2>{{ variant.name }}</h2>
+
+  {% if variant.interviews %}
+    {% for archetype_key, arch in variant.interviews.items() %}
+    <h3>{{ arch.label }}</h3>
+    {% if arch.error %}
+      <p style="color:var(--gray-500);font-style:italic;">
+        (sin respuesta: {{ arch.error }})
+      </p>
+    {% else %}
+      {% for i in range(arch.parsed|default([])|length) %}
+      {% set answer = arch.parsed[i] %}
+      {% if answer %}
+      <blockquote>
+        <strong style="display:block;font-size:12px;text-transform:uppercase;
+                       letter-spacing:0.06em;color:var(--gray-500);
+                       font-style:normal;margin-bottom:8px;">
+          Pregunta {{ i + 1 }}
+        </strong>
+        {{ answer }}
+      </blockquote>
+      {% endif %}
+      {% endfor %}
+    {% endif %}
+    {% endfor %}
+  {% else %}
+    <p style="color:var(--gray-500);"><em>(sin interviews guardadas)</em></p>
+  {% endif %}
+  {% endfor %}
+</article>
+{% endblock %}

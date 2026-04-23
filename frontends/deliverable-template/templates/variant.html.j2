@@ -1,0 +1,108 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">
+      Variante {{ variant.position|default(variant.name) }}
+    </span>
+  </div>
+
+  <h1>{{ variant.name }}</h1>
+
+  {% if variant.objective_context %}
+  <p style="font-size:20px;color:var(--gray-700);font-style:italic;margin-bottom:48px;">
+    {{ variant.objective_context }}
+  </p>
+  {% endif %}
+
+  {% if variant.key_facts %}
+  <div class="sharpz-callout" style="margin-bottom:48px;">
+    <div class="sharpz-callout-title">Hechos clave de esta variante</div>
+    <ul style="margin:8px 0 0;padding-left:20px;">
+      {% for k, v in variant.key_facts.items() %}
+      <li><strong>{{ k|replace('_', ' ')|title }}:</strong> {{ v }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {# SVG timeline chart — no JS, renders in PDF #}
+  {% set timeline = variant.metrics.timeline if variant.metrics and variant.metrics.timeline else [] %}
+  {% if timeline and timeline|length > 0 %}
+  {% set max_posts = timeline|map(attribute='posts')|max %}
+  {% set chart_w = 720 %}
+  {% set chart_h = 160 %}
+  {% set pad_l = 32 %}
+  {% set pad_r = 16 %}
+  {% set pad_t = 12 %}
+  {% set pad_b = 28 %}
+  {% set inner_w = chart_w - pad_l - pad_r %}
+  {% set inner_h = chart_h - pad_t - pad_b %}
+  {% set n = timeline|length %}
+
+  <hr class="sharpz-section-divider">
+  <h2>Actividad por hora · posts durante la sim</h2>
+  <p style="color:var(--gray-500);margin-bottom:12px;">
+    Distribución temporal de posts con contenido durante las {{ n }} horas de simulación.
+    Pico: {{ max_posts }} posts/h.
+  </p>
+  <figure class="sharpz-timeline-chart"
+          style="margin:0;padding:16px;background:var(--gray-50);border-radius:8px;">
+    <svg viewBox="0 0 {{ chart_w }} {{ chart_h }}" width="100%"
+         preserveAspectRatio="xMidYMid meet"
+         style="display:block;font-family:var(--font-ui);font-size:10px;color:var(--gray-700);">
+      <line x1="{{ pad_l }}" y1="{{ pad_t + inner_h }}"
+            x2="{{ pad_l + inner_w }}" y2="{{ pad_t + inner_h }}"
+            stroke="#cbd5e1" stroke-width="1"/>
+      {% for t in timeline %}
+      {% set bar_w = (inner_w / n) * 0.72 %}
+      {% set bar_gap = (inner_w / n) * 0.28 %}
+      {% set x = pad_l + loop.index0 * (inner_w / n) + bar_gap / 2 %}
+      {% set h = (t.posts / max_posts * inner_h) if max_posts > 0 else 0 %}
+      {% set y = pad_t + inner_h - h %}
+      <rect x="{{ x }}" y="{{ y }}" width="{{ bar_w }}" height="{{ h }}"
+            fill="var(--accent-warm, #B85C38)" rx="2">
+        <title>h{{ t.hour }} · {{ t.posts }} posts</title>
+      </rect>
+      {% if loop.index0 % 4 == 0 or loop.last %}
+      <text x="{{ x + bar_w / 2 }}" y="{{ pad_t + inner_h + 16 }}"
+            text-anchor="middle" fill="#64748b">{{ t.hour }}h</text>
+      {% endif %}
+      {% endfor %}
+      <text x="{{ pad_l - 6 }}" y="{{ pad_t + 4 }}" text-anchor="end"
+            fill="#94a3b8">{{ max_posts }}</text>
+      <text x="{{ pad_l - 6 }}" y="{{ pad_t + inner_h }}" text-anchor="end"
+            fill="#94a3b8">0</text>
+    </svg>
+    <figcaption style="font-size:11px;color:var(--gray-500);margin-top:6px;">
+      Eje X: hora de simulación (0–{{ n - 1 }}). Eje Y: posts publicados.
+    </figcaption>
+  </figure>
+  {% endif %}
+
+  <hr class="sharpz-section-divider">
+
+  <h2>Narrativa de la simulación</h2>
+  {{ narrative_html|safe }}
+
+  {% if variant.initial_posts %}
+  <hr class="sharpz-section-divider">
+  <h2>Posts iniciales (publicados en T=0)</h2>
+  <p style="color:var(--gray-500);">
+    Los mensajes que se publicaron en el minuto 0 de la simulación,
+    según el diseño estratégico de esta variante.
+  </p>
+  <div style="margin-top:24px;">
+    {% for p in variant.initial_posts %}
+    <blockquote style="margin-bottom:24px;">
+      {{ p.content }}
+      {% if p._poster_agent_name %}
+      <cite>— {{ p._poster_agent_name }} ({{ p.poster_type }})</cite>
+      {% endif %}
+    </blockquote>
+    {% endfor %}
+  </div>
+  {% endif %}
+</article>
+{% endblock %}

@@ -1,0 +1,151 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">Forecast</span>
+  </div>
+
+  <h1>Forecast de volumen y revenue</h1>
+
+  <p style="font-size:18px;color:var(--gray-700);font-style:italic;margin-bottom:32px;">
+    Proyección cuantitativa de unidades y revenue por variante, para conversación
+    con Operaciones y Finanzas. Incluye rangos optimista / medio / pesimista,
+    asunciones explícitas y análisis de sensibilidad al ratio sim-to-reality.
+  </p>
+
+  <div class="sharpz-callout" style="margin-bottom:32px;">
+    <div class="sharpz-callout-title">Confianza del modelo</div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <strong style="font-size:20px;text-transform:uppercase;">
+        {{ forecast.confidence_level or '—' }}
+      </strong>
+      <span style="font-size:13px;color:var(--gray-500);">
+        · ventana: {{ forecast.window_weeks or '—' }} semanas
+      </span>
+    </div>
+    {% if forecast.confidence_reasoning %}
+    <p style="font-size:13px;color:var(--gray-500);margin:8px 0 0 0;">
+      {{ forecast.confidence_reasoning }}
+    </p>
+    {% endif %}
+  </div>
+
+  <h2>Asunciones del modelo</h2>
+  <p>
+    El forecast no es una predicción del mundo real: es una proyección
+    <em>condicional</em> a un set de asunciones. Si cambian las asunciones,
+    cambia el forecast. Cada una está explicitada para que el CFO las pueda ajustar.
+  </p>
+  <table>
+    <thead>
+      <tr><th>Parámetro</th><th>Valor asumido</th><th>Razonamiento</th></tr>
+    </thead>
+    <tbody>
+      {% for a in (forecast.assumptions or []) %}
+      <tr>
+        <td><code>{{ a.key }}</code></td>
+        <td><strong>{{ a.value }}</strong></td>
+        <td>{{ a.rationale }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>Proyección por variante</h2>
+  {% for v in (forecast.variants or []) %}
+  <h3>
+    {{ v.variant_name }}
+    <span style="font-size:14px;color:var(--gray-500);font-weight:400;">
+      · {{ v.price_ars|default(v.price, true) }}
+    </span>
+  </h3>
+
+  <table>
+    <thead>
+      <tr><th>Métrica</th><th>Pesimista</th><th>Base</th><th>Optimista</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Unidades (ventana)</td>
+        <td>{{ v.units.pessimistic if v.units else '—' }}</td>
+        <td><strong>{{ v.units.base if v.units else '—' }}</strong></td>
+        <td>{{ v.units.optimistic if v.units else '—' }}</td>
+      </tr>
+      <tr>
+        <td>Revenue bruto</td>
+        <td>{{ v.revenue_gross.pessimistic if v.revenue_gross else '—' }}</td>
+        <td><strong>{{ v.revenue_gross.base if v.revenue_gross else '—' }}</strong></td>
+        <td>{{ v.revenue_gross.optimistic if v.revenue_gross else '—' }}</td>
+      </tr>
+      {% if v.market_share_pct %}
+      <tr>
+        <td>Market share (%)</td>
+        <td colspan="3">{{ v.market_share_pct.base }}%</td>
+      </tr>
+      {% endif %}
+    </tbody>
+  </table>
+
+  <table style="margin-top:8px;">
+    <thead><tr><th>Señal</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>Intent-rate sim (observado)</td>
+        <td>{{ (v.intent_rate_sim * 100)|round(1) if v.intent_rate_sim else '—' }}%</td>
+      </tr>
+      <tr>
+        <td>Intent-rate ajustado (post sim-to-reality discount)</td>
+        <td><strong>{{ (v.intent_rate_adjusted * 100)|round(1) if v.intent_rate_adjusted else '—' }}%</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% if v.break_even_vs_base %}
+  <p style="font-size:13px;color:var(--gray-600);margin-top:8px;">
+    <strong>Break-even:</strong> {{ v.break_even_vs_base }}
+  </p>
+  {% endif %}
+  {% endfor %}
+
+  {% if forecast.sensitivities %}
+  <h2>Análisis de sensibilidad</h2>
+  <p>Cómo cambia el revenue del winner si el ratio sim-to-reality resulta distinto al asumido.</p>
+  {% for s in forecast.sensitivities %}
+  <h3>{{ s.parameter }}</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Valor</th>
+        {% for val in s.values %}<th>{{ val }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Revenue winner</td>
+        {% for val in s.impact_on_winner_revenue %}<td>{{ val }}</td>{% endfor %}
+      </tr>
+    </tbody>
+  </table>
+  {% if s.interpretation %}
+  <p style="font-size:13px;color:var(--gray-600);">{{ s.interpretation }}</p>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+
+  {% if forecast.caveats %}
+  <h2>Caveats</h2>
+  <ul>
+    {% for c in forecast.caveats %}<li>{{ c }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if forecast.cfo_checklist %}
+  <h2>Checklist para el CFO</h2>
+  <p>Validaciones que el modelo recomienda hacer antes de comprometer P&amp;L:</p>
+  <ul>
+    {% for item in forecast.cfo_checklist %}<li>{{ item }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</article>
+{% endblock %}

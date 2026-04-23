@@ -1,0 +1,127 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">Apéndice A</span>
+  </div>
+
+  <h1>Métricas completas por variante</h1>
+
+  <p style="font-size:18px;color:var(--gray-700);font-style:italic;margin-bottom:24px;">
+    Datos cuantitativos crudos capturados durante la simulación.
+    Este apéndice es referenciado desde el reporte ejecutivo para todo detalle
+    numérico. Cada variante tiene su propio bloque con reach, engagement,
+    sentiment, fidelity, demografía y timeline hora por hora.
+  </p>
+
+  <p style="margin-bottom:48px;">
+    <a href="/api/tests/{{ test.test_id }}/metrics.csv"
+       class="sharpz-btn" download
+       style="display:inline-block;text-decoration:none;">
+      ⇣ Descargar CSV completo
+    </a>
+  </p>
+
+  {% for variant in variants %}
+  <hr class="sharpz-section-divider">
+  <h2>{{ variant.name }}</h2>
+
+  {% if variant.metrics %}
+  {% set m = variant.metrics %}
+
+  <h3>Reach y amplificación</h3>
+  <table>
+    <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>Posts con contenido</td><td>{{ m.reach.posts_with_content if m.reach else '—' }}</td></tr>
+      <tr><td>Posts originales</td><td>{{ m.reach.create_post if m.reach else '—' }}</td></tr>
+      <tr><td>Contenidos únicos</td><td>{{ m.reach.unique_contents if m.reach else '—' }}</td></tr>
+      <tr><td>Reposts</td><td>{{ m.reach.reposts if m.reach else '—' }}</td></tr>
+      <tr><td>Quotes</td><td>{{ m.reach.quotes if m.reach else '—' }}</td></tr>
+      <tr><td>Likes</td><td>{{ m.reach.likes if m.reach else '—' }}</td></tr>
+      <tr><td>Amplificación total</td><td>{{ m.reach.total_amplification if m.reach else '—' }}</td></tr>
+      <tr>
+        <td>Agentes activos</td>
+        <td>{{ m.reach.active_users if m.reach else '—' }} /
+            {{ m.reach.total_users if m.reach else '—' }}
+            ({{ m.reach.reach_pct if m.reach else '—' }}%)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Engagement quality</h3>
+  <table>
+    <thead><tr><th>Métrica</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>Engagement activo (quotes + creates)</td><td>{{ m.engagement.active_engagement if m.engagement else '—' }}</td></tr>
+      <tr><td>Engagement pasivo (likes + reposts)</td><td>{{ m.engagement.passive_engagement if m.engagement else '—' }}</td></tr>
+      <tr><td>Ratio activo</td><td>{{ m.engagement.active_ratio_pct if m.engagement else '—' }}%</td></tr>
+    </tbody>
+  </table>
+
+  {% if m.sentiment and not m.sentiment.skipped %}
+  <h3>Distribución de sentiment</h3>
+  <table>
+    <thead><tr><th>Categoría</th><th>%</th><th>Count</th></tr></thead>
+    <tbody>
+      <tr><td>Supportive</td><td>{{ m.sentiment.supportive_pct }}%</td><td>{{ m.sentiment.supportive }}</td></tr>
+      <tr><td>Critical</td><td>{{ m.sentiment.critical_pct }}%</td><td>{{ m.sentiment.critical }}</td></tr>
+      <tr><td>Neutral</td><td>{{ m.sentiment.neutral_pct }}%</td><td>—</td></tr>
+      <tr><td>Offtopic</td><td>{{ m.sentiment.offtopic_pct }}%</td><td>—</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Backlash flag:</strong> {{ m.backlash.backlash_flag if m.backlash else '—' }}</p>
+  {% endif %}
+
+  {% if m.fidelity and not m.fidelity.skipped %}
+  <h3>Fidelity del mensaje</h3>
+  <p>
+    <strong>Score:</strong> {{ m.fidelity.fidelity_score }}/100<br>
+    <strong>Razonamiento:</strong> {{ m.fidelity.reasoning }}
+  </p>
+  {% endif %}
+
+  {% if m.demographics and m.demographics.breakdown_by_entity_type %}
+  <h3>Penetración por tipo de entidad</h3>
+  <table>
+    <thead><tr><th>Tipo</th><th>Activos</th><th>Total</th><th>Penetración %</th></tr></thead>
+    <tbody>
+      {% for et, data in m.demographics.breakdown_by_entity_type.items() %}
+      <tr>
+        <td>{{ et }}</td>
+        <td>{{ data.active }}</td>
+        <td>{{ data.total }}</td>
+        <td>{{ data.penetration_pct }}%</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  {% if m.timeline %}
+  <h3>Timeline de actividad (posts por hora)</h3>
+  <table>
+    <thead><tr><th>Hora</th><th>Posts</th></tr></thead>
+    <tbody>
+      {% for t in m.timeline %}
+      <tr><td>h{{ t.hour }}</td><td>{{ t.posts }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+
+  <details style="margin-top:24px;">
+    <summary style="cursor:pointer;font-weight:600;">Raw JSON completo (para auditoría)</summary>
+    <pre style="font-size:11px;background:var(--gray-100);padding:16px;
+                border-radius:4px;overflow-x:auto;margin-top:12px;">{{ m | tojson(indent=2) }}</pre>
+  </details>
+
+  {% else %}
+  <p style="color:var(--gray-500);font-style:italic;">
+    Métricas no disponibles para esta variante.
+  </p>
+  {% endif %}
+  {% endfor %}
+</article>
+{% endblock %}

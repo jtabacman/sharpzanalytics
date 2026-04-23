@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operator login · Sharpz Analytics</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Space Grotesk', -apple-system, sans-serif;
+  background: #0a0a0a;
+  color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+}
+
+.login-card {
+  max-width: 420px;
+  width: 100%;
+  padding: 48px 36px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #111111;
+}
+
+.brand-mark {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.2em;
+  color: #888;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: #888;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+  margin-bottom: 8px;
+}
+
+input[type="password"], input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  background: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  color: #ffffff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
+  margin-bottom: 20px;
+}
+
+input:focus {
+  outline: none;
+  border-color: #ffffff;
+}
+
+button {
+  width: 100%;
+  padding: 14px 20px;
+  background: #ffffff;
+  color: #0a0a0a;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(255, 255, 255, 0.15);
+}
+
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.error-msg {
+  margin-top: 16px;
+  padding: 12px 14px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 6px;
+  color: #ff8a80;
+  font-size: 13px;
+  display: none;
+}
+
+.error-msg.visible { display: block; }
+
+.back-link {
+  display: inline-block;
+  margin-top: 24px;
+  color: #888;
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.back-link:hover { color: #fff; }
+
+.footer-note {
+  margin-top: 28px;
+  font-size: 11px;
+  color: #555;
+  line-height: 1.6;
+}
+</style>
+</head>
+<body>
+
+<div class="login-card">
+  <div class="brand-mark">Sharpz Analytics</div>
+  <h1>Operator access</h1>
+  <p class="subtitle">
+    Ingresá tu API key para acceder al dashboard de control. Si no tenés
+    una, pedila al admin.
+  </p>
+
+  <form id="login-form">
+    <label for="api-key">API Key</label>
+    <input
+      id="api-key"
+      type="password"
+      placeholder="sk_..."
+      autocomplete="off"
+      required
+    />
+    <button type="submit" id="login-btn">Login &rarr;</button>
+    <div id="error-msg" class="error-msg"></div>
+  </form>
+
+  <a href="/" class="back-link">&larr; Back to landing</a>
+
+  <p class="footer-note">
+    Client access is separate — clients receive their deliverable URL
+    directly via email.
+  </p>
+</div>
+
+<script>
+  // Minimal login — verifies API key against operator endpoint then redirects.
+  const form = document.getElementById('login-form');
+  const btn = document.getElementById('login-btn');
+  const errorBox = document.getElementById('error-msg');
+  const CONTROL_URL = 'https://control.sharpzanalytics.com/';
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errorBox.classList.remove('visible');
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+
+    const key = document.getElementById('api-key').value.trim();
+    try {
+      const res = await fetch('/api/operator/intakes?limit=1', {
+        headers: { 'X-Sharpz-Sync-Key': key },
+      });
+      if (res.status === 200) {
+        sessionStorage.setItem('sharpz_operator_key', key);
+        window.location.href = CONTROL_URL;
+      } else {
+        errorBox.textContent = 'Invalid API key or authorization failed.';
+        errorBox.classList.add('visible');
+      }
+    } catch (err) {
+      errorBox.textContent = 'Network error. Check your connection.';
+      errorBox.classList.add('visible');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Login \u2192';
+    }
+  });
+</script>
+
+</body>
+</html>

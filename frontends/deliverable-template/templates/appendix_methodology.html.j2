@@ -1,0 +1,170 @@
+{% extends "base.html.j2" %}
+
+{% block content %}
+<article class="sharpz-article">
+  <div style="margin-bottom:32px;">
+    <span class="sharpz-cover-brand" style="color:var(--accent-warm);">Apéndice D</span>
+  </div>
+
+  <h1>Metodología y limitaciones</h1>
+
+  <p style="font-size:18px;color:var(--gray-700);font-style:italic;margin-bottom:48px;">
+    Cómo se diseñó, ejecutó y analizó este experimento. Esta sección se incluye
+    para que el cliente pueda evaluar la validez de las conclusiones y replicar
+    el proceso si lo desea.
+  </p>
+
+  <h2>El experimento</h2>
+  <p>
+    Este test fue ejecutado sobre la plataforma Sharpz Analytics. La metodología
+    central es la simulación de audiencias sintéticas con IA generativa — una
+    técnica que permite testear estrategias contra audiencias virtuales
+    calibradas a un mercado específico, antes de exponerlas al mundo real.
+  </p>
+
+  <h2>Audiencia sintética</h2>
+  <p>
+    La audiencia está compuesta por <strong>{{ num_agents }} agentes</strong>
+    generados por IA, cada uno con biografía extensa (edad, país, profesión,
+    preferencias, historial, rivalidades, consumo mediático). Los agentes están
+    conectados entre sí por relaciones extraídas del seed inicial: influencia,
+    cobertura mediática, rivalidad, afinidad. Durante la simulación, cada agente
+    actúa de forma autónoma en el venue correspondiente.
+  </p>
+
+  <p>La audiencia incluye:</p>
+  <ul>
+    {% for et in entity_types_with_counts %}
+    <li><strong>{{ et.type }}:</strong> {{ et.count }} agentes ({{ et.pct }}%)</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Estructura del test</h2>
+  <p>
+    Las <strong>{{ variants_count }} variantes</strong> se corrieron
+    {% if sim_mode == "parallel" %}
+    <strong>en paralelo</strong>
+    {% else %}
+    <strong>secuencialmente</strong>
+    {% endif %}
+    sobre la MISMA audiencia sintética (mismos agentes, mismas relaciones, misma
+    semilla aleatoria). Lo único que varió entre variantes fue la propia
+    estrategia a testear. Esta configuración <em>ceteris paribus</em>
+    permite aislar el efecto de la variante sobre las reacciones observadas.
+  </p>
+
+  <h2>Duración simulada</h2>
+  <p>
+    Cada variante simuló <strong>{{ simulation_hours|default(24) }} horas</strong>
+    (o equivalente al ciclo apropiado del test_type). En cada ronda, una fracción
+    de los agentes se "despierta" según su perfil de actividad individual y toma
+    una acción autónoma informada por su perfil + lo que ve en su venue.
+  </p>
+
+  <h2>Entrevistas post-simulación</h2>
+  <p>
+    Después de la simulación, entrevistamos a
+    <strong>{{ archetypes_count }} buyer archetypes</strong>
+    con las mismas {{ questions_count|default(5) }} preguntas en cada variante,
+    para obtener feedback cualitativo directo que complementa las métricas
+    cuantitativas. Los archetypes son seleccionados para representar distintos
+    segmentos demográficos, económicos e ideológicos del mercado.
+    Las transcripciones completas están en el Apéndice B.
+  </p>
+
+  <h2>Modelos de IA utilizados</h2>
+  <p>
+    La plataforma opera con una arquitectura multi-tier vía OpenRouter.
+    Los modelos concretos usados en este test (expuestos aquí para auditoría):
+  </p>
+  <ul>
+    {% for row in model_stack|default([]) %}
+    <li>
+      <strong>{{ row.task_display }}:</strong> {{ row.model_id }}
+      {% if row.notes %}— <em>{{ row.notes }}</em>{% endif %}
+    </li>
+    {% endfor %}
+    {% if not model_stack %}
+    <li><strong>Generación en bulk (simulación, personas, entrevistas):</strong>
+        claude-haiku / claude-sonnet tier vía OpenRouter.</li>
+    <li><strong>Extracción estructurada (entidades, key facts, fidelity):</strong>
+        gpt-4o-mini / claude-haiku — estricto con schemas, bajo costo.</li>
+    <li><strong>Síntesis y reporte ejecutivo:</strong> claude-sonnet-4 con thinking —
+        narrativa cliente-facing, reasoning extendido.</li>
+    <li><strong>Embeddings:</strong> bge-m3 local (GPU) o text-embedding-3-large vía API.</li>
+    {% endif %}
+  </ul>
+
+  <h2>Validación de calidad (Quality Gates)</h2>
+  <p>
+    Cada etapa del pipeline pasa por quality gates automáticos + un QA review
+    LLM que detecta coherencia semántica, antes de continuar. Se verifica:
+    cobertura de archetypes críticos, distribución de artefactos iniciales,
+    heartbeat de la simulación, consistencia del sentiment, validación
+    del idioma, parseabilidad del veredicto, y ausencia de alucinaciones
+    sobre hechos clave (precios, fechas, specs, leyes, citas).
+  </p>
+  <p>
+    El QA review opera bajo <strong>anti-bias invariants estrictos</strong>:
+    NO modifica opiniones del panel — solo corrige coherencia y factualidad.
+    Un LP bearish legítimo se queda bearish. Toda corrección aplicada se loguea
+    con razón explícita en el event log.
+  </p>
+
+  <h2>Limitaciones conocidas</h2>
+  <p>Honestidad metodológica — el equipo de Sharpz considera importante que el
+     cliente conozca explícitamente las limitaciones del enfoque:</p>
+  <ul>
+    {% if limits %}
+    {% for limit in limits %}
+    <li>{{ limit }}</li>
+    {% endfor %}
+    {% else %}
+    <li><strong>Efectos de competencia reactiva no simulados:</strong> la simulación
+        asume que la competencia mantiene su posicionamiento actual durante la
+        ventana. En el mundo real, un anuncio grande puede disparar respuestas
+        competitivas que alteran la dinámica.</li>
+    <li><strong>Shock mediático offline:</strong> el simulador cubre los venues
+        digitales/directos. No modela cobertura de TV masiva, conversación offline,
+        ni generación espontánea de memes en plataformas no simuladas.</li>
+    <li><strong>Variabilidad entre corridas:</strong> los LLMs tienen variabilidad
+        inherente. Un mismo escenario corrido dos veces puede producir reacciones
+        ligeramente distintas. Para decisiones de alto impacto, recomendamos
+        múltiples corridas con distintas seeds (tiers Premium y Ultra).</li>
+    <li><strong>Escala poblacional:</strong> los agentes simulados son representantes,
+        no una muestra estadística del mercado. Los porcentajes son señales
+        relativas entre variantes, no predicciones de conversion rate absoluto.</li>
+    <li><strong>Horizonte temporal:</strong> efectos de largo plazo
+        (fatiga de marca, recall post-6-meses, impacto en recompra)
+        requieren metodologías complementarias.</li>
+    {% endif %}
+  </ul>
+
+  <h2>Reproducibilidad</h2>
+  <p>
+    Toda corrida se ejecuta con una semilla RNG fija para maximizar reproducibilidad.
+    El DNA del test_type se embebe inmutable en el Test record — un re-render años
+    después usa exactamente la misma configuración declarativa.
+    El audit log completo (cada llamada a LLM, cada quality gate, cada corrección
+    del QA review, cada transición de estado) se preserva y está disponible para
+    revisión técnica bajo pedido.
+    El ID técnico de este test es <code>{{ test.test_id }}</code>.
+  </p>
+
+  <h2>Sobre Sharpz</h2>
+  <p>
+    Sharpz Analytics es una plataforma de testing de estrategias sobre audiencias
+    sintéticas calibradas por mercado. Combinamos modelado de audiencias con IA
+    generativa + simulación dinámica en venues específicos del test_type +
+    síntesis ejecutiva automatizada para entregar a marcas, partidos y consultoras
+    la posibilidad de testear movidas estratégicas contra una audiencia virtual
+    en minutos, no semanas.
+  </p>
+
+  <hr class="sharpz-section-divider">
+  <p style="font-size:13px;color:var(--gray-500);font-style:italic;">
+    Para consultas técnicas sobre metodología, auditoría del proceso o replicación
+    del experimento, contactar al equipo de Sharpz.
+  </p>
+</article>
+{% endblock %}

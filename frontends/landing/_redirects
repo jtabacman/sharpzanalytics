@@ -1,0 +1,15 @@
+# Netlify routing — sharpzanalytics.com
+# Backend paths proxy to the Cloudflare Tunnel URL of the FastAPI backend.
+# BACKEND_URL placeholder: replace with actual tunnel URL at deploy time
+# (e.g. https://sharpz.trycloudflare.com or a dedicated subdomain).
+
+# API + dynamic routes → backend
+/api/*         https://backend.sharpzanalytics.com/api/:splat   200
+/intake/*      https://backend.sharpzanalytics.com/intake/:splat 200
+/report/*      https://backend.sharpzanalytics.com/report/:splat 200
+
+# Deprecated legacy routes (redirect permanent, preserves old links)
+/old-intake/*  /intake/:splat                                   301
+
+# SPA fallback for any other non-asset path (unlikely — landing is static HTML)
+/*             /index.html                                      200
