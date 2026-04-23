@@ -1,0 +1,173 @@
+# dna: brand_sentiment_shift
+# Version: 1.0.0
+
+test_type: brand_sentiment_shift
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Evaluar si una movida del brand (rebrand, CEO statement, product pivot,
+    partnership, reposicionamiento) cambia cómo lo perciben y a qué costo.
+  decision_question: "¿Esta movida cambia cómo nos perciben, y es cambio neto positivo?"
+  buyer_profile:
+    - "CMO / Head of Brand"
+    - "VP Corporate Communications"
+    - "Brand strategist de agencia"
+  typical_trigger: "Pre-anuncio de rebrand major, CEO statement controversial, partnership estratégico"
+  decision_outputs: [GO, CONDITIONAL_GO, DELAY_AND_REFINE, NO_GO]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "Current consumer / user loyal"
+      - "Former customer / lapsed"
+      - "Influencer / opinion leader de categoría"
+      - "Critic / watchdog del brand"
+      - "Press / trade media"
+      - "Industry peer / competitor-watcher"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: media_outlet, count: "4-6"}
+      - {type: competing_brand, count: "3-5"}
+      - {type: advocacy_or_watchdog, count: "1-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 100
+    per_anchor_cap: [12, 25]
+
+  composition_targets:
+    current_consumers_pct: {min: 35, max: 45}
+    influencers_pct: {min: 15, max: 22}
+    critics_former_pct: {min: 15, max: 22}
+    press_pct: {min: 12, max: 18}
+    peers_pct: {min: 8, max: 14}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency, EnterpriseBuyingCommittee]
+
+  quality_requirements:
+    bio_length_min_words: 250
+    bio_length_target_words: 320
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 100, min: 70, max: 150}
+  duration: {simulated_time: "14d_post_announcement", wall_clock_target_minutes: 14}
+  rounds: {min: 14, default: 18, max: 24}
+  propagation: {type: venue_rules, cross_agent_visibility: controlled}
+
+setting:
+  category: digital_feed
+  description: >
+    Brand movement se propaga en social feed + press cycle. Mezcla reacciones
+    consumers rápidas + coverage press + debate entre opinion leaders.
+  message_tone_defaults:
+    formality: medium_low
+    technical_density: low
+    emotion_expression: moderate_to_high
+
+venue:
+  reference: "venues/social_viral.yaml"
+  combined_with_secondary: "venues/press_cycle.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image]
+  required_fields:
+    - baseline_brand_perception
+    - move_description            # la movida concreta
+    - move_reason_official        # explicación pública
+    - timing_context
+  variants_min: 1    # suele ser 1 move, opcional test variants de comms
+  variants_max: 3
+  delivery_format: {initial_drop: "Announcement publicado via channel natural"}
+
+metrics:
+  primary:
+    - delta_brand_attributes            # 5-10 attrs (authentic, innovative, trustworthy, ...)
+    - segmentation_of_who_moves         # fans vs critics vs neutral
+    - backlash_risk
+    - viral_coefficient
+    - permanent_vs_transient_shift_estimate
+  secondary:
+    - press_tone_distribution
+    - competitor_response_detection
+    - loyalty_retention_signal
+  never_emphasize: [pure_reach_without_sentiment]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, before_after_perception_map,
+     segmentation_of_movers, backlash_analysis, recommendations, what_to_monitor,
+     honest_caveats, appendices]
+  unique_sections: [before_after_perception_map, permanent_vs_transient_analysis, backlash_topology]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks: [phantom_entities, off_target_archetype, media_outlet_relevance, advocacy_alignment, duplicates_encoding]
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - factual_hallucination
+      - competitor_coherence
+      - language_drift
+      - copy_propagation
+      - loyalty_coherence   # brand loyalist no se vuelve critic sin razón narrativa
+  post_stage_6:
+    checks: [quote_validation, exaggeration, agent_attribution]
+  post_stage_7:
+    checks: [winner_confidence_calibration, caveat_erosion, optimism_bias, structural_compliance]
+  anti_bias_invariants:
+    - "Si el panel mayoritariamente dislikes la movida, reporte lo dice"
+    - "Backlash reportado honestamente, sin minimizar"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 70, rounds_default: 14}
+  pro: {multi_run: 3, panel_size_default: 100, rounds_default: 18}
+  premium: {multi_run: 5, panel_size_default: 130, rounds_default: 22}
+  ultra:
+    multi_run: 10
+    panel_size_default: 150
+    rounds_default: 24
+    features_unlocked: [multi_lang, longitudinal_re_test_after_N_months]
+
+limits:
+  - "Impact real a 6-12 meses no modelado — venue es 14d window"
+  - "Revenue impact directo requiere data real, no inferible del panel"
+  - "Cultural context-specific — movidas que funcionan en un mercado pueden no en otro"
+  - "Crisis events unrelated durante la ventana no modelados"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_brand_24mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "major_rebrand OR CEO_transition", suggest: premium}
+    - {trigger: "global_brand OR publicly_traded_company", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/brand_sentiment_shift/intake.yaml"
+  amplifier: "prompts/brand_sentiment_shift/amplifier.yaml"
+  entity_extractor: "prompts/brand_sentiment_shift/entity_extractor.yaml"
+  persona_generator: "prompts/brand_sentiment_shift/persona.yaml"
+  stimulus_delivery: "prompts/brand_sentiment_shift/stimulus_delivery.yaml"
+  agent_action_post: "prompts/brand_sentiment_shift/action_post.yaml"
+  agent_action_press: "prompts/brand_sentiment_shift/action_press.yaml"
+  agent_action_wom: "prompts/brand_sentiment_shift/action_wom.yaml"
+  interview: "prompts/brand_sentiment_shift/interview.yaml"
+  narrative_per_variant: "prompts/brand_sentiment_shift/narrative.yaml"
+  executive_judge: "prompts/brand_sentiment_shift/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/brand_sentiment_shift/qa_reviewer.yaml"
+  pattern_extractor: "prompts/brand_sentiment_shift/pattern_extractor.yaml"

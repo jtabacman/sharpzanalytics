@@ -1,0 +1,224 @@
+# dna: policy_rollout
+# Version: 1.0.0
+
+test_type: policy_rollout
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Evaluar si una policy va a tener rollout exitoso, identificando
+    gainers/losers/implementers, unintended consequences, y legal challenge
+    probability antes de announcement.
+  decision_question: "¿Esta policy va a tener rollout exitoso?"
+  buyer_profile:
+    - "Government agency head / policy director"
+    - "Think tank / research policy lead"
+    - "ONG / advocacy de implementación"
+    - "Policy lab researcher"
+  typical_trigger: "Pre-announcement de policy, pre-rule-finalization, pre-implementation decision"
+  decision_outputs: [GO_AS_DESIGNED, GO_WITH_AMENDMENTS, DELAY_FOR_REDESIGN, NO_GO]
+
+panel:
+  anchors_spec:
+    count: {min: 6, max: 10, recommended: 8}
+    examples:
+      - "Gainer direct (beneficia de policy)"
+      - "Loser direct (pierde con policy)"
+      - "Neutral affected (impacto ambiguo)"
+      - "Local implementer (agency, field officer)"
+      - "Academic / policy expert"
+      - "Advocacy group pro-policy"
+      - "Advocacy group anti-policy"
+      - "Industry association affected"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: regulator_agency_implementing, count: "1-3"}
+      - {type: media_outlet, count: "4-6"}
+      - {type: academic_institution, count: "2-3"}
+      - {type: class_action_law_firm, count: "1-2"}
+      - {type: industry_association, count: "2-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 880
+    per_anchor_cap: [80, 150]
+    note: "80 delib (stakeholders) + 800 survey (affected population)"
+
+  composition_targets:
+    gainers_pct: {min: 22, max: 30}
+    losers_pct: {min: 22, max: 30}
+    neutral_affected_pct: {min: 15, max: 25}
+    local_implementers_pct: {min: 12, max: 18}
+    voice_academic_advocacy_pct: {min: 12, max: 18}
+
+  exclude_entity_types: [UnrelatedBrand, UnrelatedConsumerCategory]
+
+  quality_requirements:
+    bio_length_min_words: 250
+    bio_length_target_words: 320
+
+simulation:
+  mode: hybrid
+  panel_size: {default: 880, min: 400, max: 1500}
+  duration: {simulated_time: "60d_rollout_arc", wall_clock_target_minutes: 18}
+  rounds: {min: 14, default: 20, max: 28}
+  propagation: {type: venue_rules, cross_agent_visibility: mixed_by_channel}
+  hybrid_config:
+    phase_1_deliberation: {agents: "80 stakeholders", purpose: "process + hearings + legal challenge"}
+    phase_2_survey_batch: {agents: "800 affected", purpose: "acceptance + implementation feasibility signal"}
+
+setting:
+  category: in_person_panel
+  combined_with: [digital_threaded, email_async]
+  description: >
+    Public hearings + written comment period + community WhatsApp + press
+    coverage + implementer memos + legal challenges. Real policy rollout tiene
+    múltiples canales con timing distinto.
+  message_tone_defaults:
+    formality: high
+    technical_density: high
+    emotion_expression: moderate
+
+venue:
+  reference: "venues/town_hall.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste]
+  required_fields:
+    - policy_text_full
+    - rollout_plan
+    - talking_points_official
+    - affected_population_description
+    - expected_gainers_losers
+    - jurisdiction
+  optional_fields: [legal_precedent_cited, budget_allocation, timeline_critical_dates]
+  variants_min: 1
+  variants_max: 3
+  variants_examples:
+    - "Policy as currently drafted"
+    - "Policy with amendment X addressing implementation concern"
+    - "Phased rollout variant (pilot first)"
+  delivery_format: {initial_drop: "Policy announcement via agency channels"}
+
+metrics:
+  primary:
+    - acceptance_rate_by_stakeholder_class
+    - implementation_feasibility_pct
+    - unintended_consequences_watchlist_count
+    - legal_challenge_probability_0_1
+    - media_narrative_arc_trend
+  secondary:
+    - hearing_turnout_by_segment
+    - written_comment_volume_by_stance
+    - community_whatsapp_sentiment_distribution
+    - implementer_memo_concerns_ranked
+    - cross_jurisdictional_friction
+  outputs_unique:
+    - stakeholder_matrix_gain_lose_x_power_voice
+    - implementation_risk_map
+    - unintended_consequences_ranking
+  never_emphasize: [pure_volume_without_stance]
+
+report:
+  required_sections:
+    [executive_summary, context_of_policy, stakeholder_matrix, acceptance_by_class,
+     implementation_feasibility, unintended_consequences_watchlist, legal_challenge_probability,
+     media_narrative_arc, recommended_amendments, what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [stakeholder_matrix_gain_lose_x_power_voice, implementation_risk_map, unintended_consequences_ranking]
+  length_target: {min_words: 6000, target_words: 7500}
+  quote_requirements: {min_validated: 18}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - jurisdictional_authority_match
+      - gainer_loser_plausibility
+      - implementer_sites_relevant
+      - academic_credential_check
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - hearing_tone_formal
+      - whatsapp_tone_casual
+      - implementer_pragmatism
+      - academic_data_not_hallucinated
+      - advocacy_coalition_coherence
+      - legal_challenge_basis_plausible
+      - cross_phase_timing_realistic
+      - no_neutral_affected_at_hearings   # hearings attract engaged, not neutral
+      - implementer_memo_internal_tone
+      - language_drift
+  post_stage_6:
+    checks: [stakeholder_matrix_accurate, unintended_consequences_derived_from_data, quote_validation, exaggeration]
+  post_stage_7:
+    checks:
+      - implementation_feasibility_gradient_calibrated
+      - legal_challenge_probability_justified
+      - media_narrative_arc_honest
+      - caveat_erosion
+      - optimism_bias
+      - winner_confidence_calibration
+  anti_bias_invariants:
+    - "Policy reports DEBEN ser POLITICALLY NEUTRAL"
+    - "Si implementation feasibility es baja, reportar directo"
+    - "Unintended consequences NO se minimizan"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 400}
+  pro: {multi_run: 3, panel_size_default: 880}
+  premium: {multi_run: 5, panel_size_default: 1200}
+  ultra:
+    multi_run: 10
+    panel_size_default: 1500
+    features_unlocked: [multi_lang, regional_subpanel_comparison, longitudinal_rollout_tracking]
+
+limits:
+  - "Real rollout takes months/years — venue compresses to weeks"
+  - "Political economy of implementation (bureaucratic capture) simplified"
+  - "Judicial decision-making not modeled — legal_challenge filed but outcome not predicted"
+  - "Cultural specificity per region muy importante — requiere calibration per geography"
+  - "Dynamic policy adjustment (agency changes rule mid-rollout) no modelado"
+  - "Network effects between policies (how this interacts con adjacent rules) no capturados"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_jurisdiction_24mo", max_injected: 6}
+
+pricing_recommendation:
+  default_tier: premium
+  notes: "Policy rollout es high-stakes — costo de policy failed es severo"
+  upgrade_triggers:
+    - {trigger: "national_policy OR multi_billion_budget", suggest: ultra}
+    - {trigger: "constitutional_question_present", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/policy_rollout/intake.yaml"
+  amplifier: "prompts/policy_rollout/amplifier.yaml"
+  entity_extractor: "prompts/policy_rollout/entity_extractor.yaml"
+  persona_generator: "prompts/policy_rollout/persona.yaml"
+  stimulus_delivery: "prompts/policy_rollout/stimulus_delivery.yaml"
+  agent_action_hearing: "prompts/policy_rollout/action_hearing.yaml"
+  agent_action_written_comment: "prompts/policy_rollout/action_written_comment.yaml"
+  agent_action_implementer_memo: "prompts/policy_rollout/action_implementer_memo.yaml"
+  agent_action_whatsapp_community: "prompts/policy_rollout/action_whatsapp_community.yaml"
+  agent_action_academic_analysis: "prompts/policy_rollout/action_academic_analysis.yaml"
+  agent_action_advocacy_release: "prompts/policy_rollout/action_advocacy_release.yaml"
+  agent_action_legal_challenge: "prompts/policy_rollout/action_legal_challenge.yaml"
+  agent_action_regulator_guidance: "prompts/policy_rollout/action_regulator_guidance.yaml"
+  survey_affected_population: "prompts/policy_rollout/survey_affected_population.yaml"
+  interview: "prompts/policy_rollout/interview.yaml"
+  narrative_per_variant: "prompts/policy_rollout/narrative.yaml"
+  executive_judge: "prompts/policy_rollout/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/policy_rollout/qa_reviewer.yaml"
+  pattern_extractor: "prompts/policy_rollout/pattern_extractor.yaml"

@@ -1,0 +1,186 @@
+# dna: competitive_response
+# Version: 1.0.0
+
+test_type: competitive_response
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Evaluar cómo responder al move de un competidor (ya ejecutado) testeando
+    3-4 respuestas estratégicas antes de comprometer recursos.
+  decision_question: "¿Cómo respondemos al move del competidor?"
+  buyer_profile:
+    - "Head of Strategy / VP Strategy"
+    - "CEO en compete-response mode"
+    - "Product marketing lead defendiendo posicionamiento"
+  typical_trigger: "Competidor lanzó producto/feature/precio impactante; ventana 24-72h critical"
+  decision_outputs: [RESPOND_HARD, RESPOND_SOFT, IGNORE_AND_DIFFERENTIATE, ACCELERATE_UNRELATED]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "Customer del competidor (potential switcher)"
+      - "Customer tuyo loyal (potential defector si no respondés)"
+      - "Prospect neutral evaluando ambos"
+      - "Tech press / analyst cubriendo la space"
+      - "Industry watcher / opinion leader"
+      - "Partner / channel observando"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: the_competitor, count: 1, rationale: "El competitor es focal"}
+      - {type: other_competitors, count: "1-3"}
+      - {type: media_outlet, count: "3-5"}
+      - {type: analyst_firm, count: "1-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 80
+    per_anchor_cap: [10, 20]
+
+  composition_targets:
+    competitor_customers_pct: {min: 20, max: 30}
+    your_customers_pct: {min: 25, max: 35}
+    prospects_neutral_pct: {min: 20, max: 30}
+    press_analysts_pct: {min: 15, max: 25}
+    partners_pct: {min: 5, max: 12}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency, IrrelevantConsumer]
+
+  quality_requirements:
+    bio_length_min_words: 250
+    bio_length_target_words: 320
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 80, min: 60, max: 120}
+  duration: {simulated_time: "21d_post_competitor_move", wall_clock_target_minutes: 14}
+  rounds: {min: 16, default: 20, max: 26}
+  propagation: {type: venue_rules, cross_agent_visibility: controlled}
+
+setting:
+  category: hybrid_multi_channel
+  description: >
+    Response se juega en múltiples canales: statement público, direct comms a
+    customers (email/DM), press briefings, product moves. Los competidores pueden
+    contra-responder. Timing es metric crítico.
+  message_tone_defaults:
+    formality: medium_high
+    technical_density: medium
+    emotion_expression: low
+
+venue:
+  reference: "venues/press_cycle.yaml"
+  combined_with_secondary: "venues/social_viral.yaml"
+  channels_mix:
+    - press_statement
+    - direct_customer_comms
+    - social_posts
+    - analyst_briefing
+    - internal_leak_risk
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image]
+  required_fields:
+    - competitor_move_summary       # lo que hicieron (inputed as fact)
+    - your_response_variants        # 3-4 alternativas
+    - timing_assumption             # when respond: 24h / 1 week / 1 month
+  variants_min: 3
+  variants_max: 4
+  delivery_format:
+    round_0: "Competitor move is common knowledge to panel"
+    round_1: "You deploy response variant via initial channel"
+
+metrics:
+  primary:
+    - customer_defection_risk_to_them
+    - customer_defection_risk_of_theirs_to_you
+    - narrative_lead_score          # ¿quién gana la conversación?
+    - timing_sensitivity_24h_vs_week_vs_month
+    - press_coverage_tone_distribution
+  secondary:
+    - analyst_stance_distribution
+    - internal_signal_leak_risk
+    - unintended_effects_on_other_competitors
+    - partner_channel_reaction
+  never_emphasize: [raw_post_volume]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, variant_ranking, reaction_by_segment,
+     narrative_control_analysis, timing_sensitivity, defection_risk_map,
+     what_to_monitor, honest_caveats, appendices]
+  unique_sections: [timing_sensitivity_analysis, narrative_lead_score_breakdown, second_order_effects]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks: [phantom_entities, competitor_real_competitor, media_outlet_relevance, duplicates_encoding]
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - factual_hallucination
+      - competitor_coherence   # el competidor sigue actuando como competidor, no apoya al subject
+      - your_customer_loyalty_coherence
+      - language_drift
+      - copy_propagation
+      - timing_plausibility
+  post_stage_6:
+    checks: [quote_validation, exaggeration, agent_attribution]
+  post_stage_7:
+    checks: [winner_confidence_calibration, caveat_erosion, optimism_bias, structural_compliance]
+  anti_bias_invariants:
+    - "Si la respuesta NO funciona, reportarlo directo"
+    - "IGNORE_AND_DIFFERENTIATE es output legítimo si data lo sustenta"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 60, rounds_default: 16}
+  pro: {multi_run: 3, panel_size_default: 80, rounds_default: 20}
+  premium: {multi_run: 5, panel_size_default: 100, rounds_default: 24}
+  ultra:
+    multi_run: 10
+    panel_size_default: 120
+    rounds_default: 26
+    features_unlocked: [live_operator_intervention, competitor_counter_response_modeling]
+
+limits:
+  - "Competitor's real counter-response no modelada (ellos no son agente)"
+  - "Ejecución de la response asumida correct"
+  - "Mercados B2B con long sales cycles requieren horizonte más largo"
+  - "Regulatory dimensions (antitrust) no modeladas"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_competitor_24mo", max_injected: 6}
+
+pricing_recommendation:
+  default_tier: premium
+  notes: "Competitive response rara vez economy — el downside de responder mal es alto"
+  upgrade_triggers:
+    - {trigger: "revenue_at_risk > 10M_usd", suggest: ultra}
+    - {trigger: "public_company OR publicly_traded_competitor", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/competitive_response/intake.yaml"
+  amplifier: "prompts/competitive_response/amplifier.yaml"
+  entity_extractor: "prompts/competitive_response/entity_extractor.yaml"
+  persona_generator: "prompts/competitive_response/persona.yaml"
+  stimulus_delivery: "prompts/competitive_response/stimulus_delivery.yaml"
+  agent_action_press: "prompts/competitive_response/action_press.yaml"
+  agent_action_customer_comms: "prompts/competitive_response/action_customer_comms.yaml"
+  agent_action_analyst_briefing: "prompts/competitive_response/action_analyst_briefing.yaml"
+  agent_action_social: "prompts/competitive_response/action_social.yaml"
+  interview: "prompts/competitive_response/interview.yaml"
+  narrative_per_variant: "prompts/competitive_response/narrative.yaml"
+  executive_judge: "prompts/competitive_response/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/competitive_response/qa_reviewer.yaml"
+  pattern_extractor: "prompts/competitive_response/pattern_extractor.yaml"

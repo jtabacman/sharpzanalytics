@@ -1,0 +1,195 @@
+# dna: creative_test
+# Version: 1.0.0
+# Schema reference: docs/dna-spec.md
+
+test_type: creative_test
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 2-5 creatividades alternativas (ad, video, carousel, storyboard)
+    con audiencia sintética antes de producción final o media buy.
+  decision_question: "¿Qué creatividad va al aire?"
+  buyer_profile:
+    - "Director creativo / ECD de agencia"
+    - "CMO evaluando concepts de agencia"
+    - "Head of brand validando pre-produccion"
+  typical_trigger: "Pre-produccion de ad major (>$100K production), pre-launch de campaña"
+  decision_outputs: [GO_CREATIVE_A, GO_CREATIVE_B, GO_CREATIVE_C, MIX_AB, RESHOOT]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "Consumer target demographic central"
+      - "Opinion leader / reviewer de categoría"
+      - "Critic / skeptic (bias negative)"
+      - "Brand loyalist de brand tested"
+      - "Brand loyalist de competidor"
+      - "Cultural amplifier (high-reach)"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_brand, count: "3-5"}
+      - {type: media_category, count: "2-4"}
+      - {type: cultural_reference, count: "2-5", rationale: "Memes/trends que la creatividad toca"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 1000
+    per_anchor_cap: [100, 250]
+
+  composition_targets:
+    consumers_target_pct: {min: 55, max: 65}
+    opinion_leaders_pct: {min: 12, max: 18}
+    critics_pct: {min: 12, max: 18}
+    media_pct: {min: 5, max: 10}
+    brand_loyalists_pct: {min: 5, max: 10}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency, EnterpriseBuyingCommittee]
+
+  quality_requirements:
+    bio_length_min_words: 150
+    bio_length_target_words: 180
+
+simulation:
+  mode: survey_batch
+  panel_size: {default: 1000, min: 300, max: 2000}
+  duration: {wall_clock_target_minutes: 12}
+  rounds: 1
+  propagation: {type: none, cross_agent_visibility: social_proof_only}
+  survey_config:
+    questions_ref: "prompts/creative_test/survey_questions.yaml"
+    response_format: structured
+    batch_size: 100
+    parallelism: 50
+
+setting:
+  category: digital_feed
+  description: >
+    El agente ve el ad "en su feed" (Instagram/TikTok/YouTube/TV preroll).
+    Reacción inmediata en los primeros 3 segundos decide si sigue viendo.
+    Puede comentar en chat, compartir, o scroll-past.
+  message_tone_defaults:
+    formality: low
+    emotion_expression: high
+    hedging_norm: low
+  non_verbal_signals_accepted: false
+
+venue:
+  reference: "venues/social_viral.yaml"
+  venue_submode: exposure_first_reaction
+
+stimulus:
+  formats_accepted: [image, video, carousel, text_paste, pdf_storyboard]
+  required_fields:
+    - creative_variants      # 2-5 ads/videos/storyboards
+    - target_platform        # instagram | tiktok | youtube | tv | ooh | mixed
+    - campaign_context       # brand, product, campaign brief one-para
+  variants_min: 2
+  variants_max: 5
+  delivery_format:
+    one_variant_per_agent: random_weighted_by_segment_balance
+    extraction_method: vision_llm_for_images_video_first_frames
+
+metrics:
+  primary:
+    - recall_24h_pct
+    - emotional_response_distribution  # excited/amused/confused/annoyed/indifferent
+    - brand_association_strength
+    - share_ability_score
+    - controversy_risk_pct
+  secondary:
+    - stop_scroll_rate_3s
+    - watch_completion_rate
+    - call_to_action_clarity
+    - memorability_score
+  never_emphasize: [viral_coefficient_absolute, intent_to_buy_absolute]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, variant_ranking, reaction_by_segment,
+     red_flags, strongest_elements, edit_recommendations, what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [moment_by_moment_breakdown, edit_recommendations, platform_fit_analysis]
+  length_target: {min_words: 4500, target_words: 5500}
+  quote_requirements: {min_validated: 20}
+  language_policy: {default: match_intake_locale}
+
+one_pager:
+  structure: SHARED_V1
+  length: {min_words: 400, max_words: 600}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - off_target_archetype
+      - cultural_reference_plausibility
+      - demographic_distribution_sanity
+
+  post_stage_4:
+    checks:
+      - response_coherence
+      - emotion_tone_match   # reactions match the platform
+      - structured_output_compliance
+      - no_cross_variant_contamination
+      - language_drift
+
+  post_stage_6:
+    checks:
+      - quote_validation
+      - distribution_vs_narrative
+      - exaggeration
+
+  post_stage_7:
+    checks:
+      - winner_confidence_calibration
+      - caveat_erosion
+      - optimism_bias
+      - structural_compliance
+
+  anti_bias_invariants:
+    - "QA no cambia opiniones del panel — solo coherencia"
+    - "Critical segments no se suavizan"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 300}
+  pro: {multi_run: 3, panel_size_default: 1000}
+  premium: {multi_run: 5, panel_size_default: 1500}
+  ultra:
+    multi_run: 10
+    panel_size_default: 2000
+    features_unlocked: [multi_modal_video_analysis, moment_level_sentiment, multi_language_panel]
+
+limits:
+  - "Reacción simulada a creatividad ≠ recall real 30d post-launch"
+  - "Dynamics de algoritmo real (impression cap, frequency) no modelados"
+  - "Production quality impact solo aproximado (creativo roughcut vs polished)"
+  - "Cultural references shifting entre generaciones/geografías"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_brand_12mo", max_injected: 6}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "production_budget > 500K_usd", suggest: premium}
+    - {trigger: "global_campaign OR super_bowl_tier", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/creative_test/intake.yaml"
+  amplifier: "prompts/creative_test/amplifier.yaml"
+  entity_extractor: "prompts/creative_test/entity_extractor.yaml"
+  persona_generator: "prompts/creative_test/persona.yaml"
+  survey_questions: "prompts/creative_test/survey_questions.yaml"
+  response_generator: "prompts/creative_test/response.yaml"
+  narrative_per_variant: "prompts/creative_test/narrative.yaml"
+  executive_judge: "prompts/creative_test/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/creative_test/qa_reviewer.yaml"
+  pattern_extractor: "prompts/creative_test/pattern_extractor.yaml"

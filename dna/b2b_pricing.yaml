@@ -1,0 +1,219 @@
+# dna: b2b_pricing
+# Version: 1.0.0
+
+test_type: b2b_pricing
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear pricing + packaging B2B simulando un ciclo de venta enterprise
+    completo (demo → Slack interno → procurement → CFO → contract) para
+    identificar deal velocity, discount pressure y alignment risk.
+  decision_question: "¿Cómo estructuramos pricing + packaging B2B?"
+  buyer_profile:
+    - "SaaS B2B CEO / CRO"
+    - "Head of Revenue / Revenue Operations"
+    - "VP Sales evaluando tiers + packaging"
+    - "Pricing strategy consultant"
+  typical_trigger: "Pre-launch de pricing re-architecture, decision sobre expansion tier, renewal playbook redesign"
+  decision_outputs: [GO_TIER_STRUCTURE_A, GO_TIER_STRUCTURE_B, BUNDLE_REDESIGN, CUSTOM_ENTERPRISE_ONLY]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "VP Eng / technical evaluator (champion)"
+      - "VP Product / end user representative"
+      - "End user individual (day-to-day)"
+      - "Procurement / sourcing lead"
+      - "CFO / finance gate"
+      - "Consultant / integrator que recomienda"
+      - "Legal / contract reviewer"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_product, count: "3-5"}
+      - {type: industry_analyst_firm, count: "2-3"}
+      - {type: build_vs_buy_consideration, count: "1-2"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 240
+    per_anchor_cap: [25, 60]
+    note: "40 delib (buying team simulation) + 200 survey (external validation)"
+
+  composition_targets:
+    technical_eval_pct: {min: 20, max: 28}
+    end_user_pct: {min: 18, max: 25}
+    procurement_pct: {min: 15, max: 22}
+    leadership_finance_pct: {min: 15, max: 22}
+    consultants_integrators_pct: {min: 10, max: 15}
+    competitors_aware_pct: {min: 5, max: 10}
+
+  exclude_entity_types: [B2C_Consumer, RetailCustomer, IndividualInvestor]
+
+  quality_requirements:
+    bio_length_min_words: 280
+    bio_length_target_words: 360
+
+simulation:
+  mode: hybrid
+  panel_size: {default: 240, min: 120, max: 400}
+  duration: {simulated_time: "45d_sales_cycle_compressed", wall_clock_target_minutes: 16}
+  rounds: {min: 14, default: 20, max: 26}
+  propagation: {type: venue_rules, cross_agent_visibility: role_dependent}
+  hybrid_config:
+    phase_1_deliberation: {agents: "40 buying team (5-10 per deal × 4-6 buying teams)", purpose: "deal dynamics"}
+    phase_2_survey_batch: {agents: "200 external", purpose: "pricing perception validation"}
+
+setting:
+  category: hybrid_multi_channel
+  description: >
+    Multi-channel B2B cycle: vendor demo (in-person/video), internal Slack
+    (messaging_private), procurement email (formal async), CFO memo (very_high),
+    contract redlines (very_high). Latency proportional a phase type.
+  message_tone_defaults:
+    formality: variable_by_channel
+    technical_density: high
+
+venue:
+  reference: "venues/b2b_sales_cycle.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste]
+  required_fields:
+    - pricing_deck                # tiers + features
+    - standard_contract_terms
+    - target_icp_primary
+    - proposed_pricing_variants   # 2-4 variants
+    - standard_discount_policy
+  variants_min: 2
+  variants_max: 4
+  variants_examples:
+    - "Current pricing (control)"
+    - "Simplified 3-tier with clear ladder"
+    - "Usage-based primary + base tier"
+    - "Enterprise-only bespoke pricing"
+  delivery_format:
+    round_1: "Vendor AE presents pricing to buying team (demo + pricing deck)"
+    subsequent_phases: "Internal debrief → procurement negotiation → CFO approval → contract"
+
+metrics:
+  primary:
+    - deal_velocity_days          # demo to close
+    - discount_pressure_pct
+    - stakeholder_alignment_score
+    - feature_tradeoff_rankings
+    - expansion_probability_y2
+  secondary:
+    - champion_identification_by_name
+    - detractor_identification_by_name
+    - adoption_risk_score
+    - contract_redline_friction_points
+    - budget_fit_vs_stretch
+    - close_lost_reasons_ranked
+  outputs_unique:
+    - recommended_pricing_architecture
+    - tier_capturing_most_revenue
+    - discount_guardrails
+    - expansion_playbook_per_segment
+  never_emphasize: [raw_deal_count_without_velocity]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, pricing_variant_comparison,
+     buying_team_dynamics_per_variant, deal_velocity_analysis, discount_pressure_analysis,
+     stakeholder_alignment_breakdown, expansion_probability, recommended_architecture,
+     what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [recommended_pricing_architecture, tier_capturing_most_revenue, expansion_playbook]
+  length_target: {min_words: 5500, target_words: 6500}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - buying_team_composition_plausible  # technical + end user + leadership + finance + legal
+      - icp_match_to_test_subject
+      - procurement_role_senior_enough
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - stakeholder_role_consistency       # CFO NO postea en Slack '@here ship it'
+      - competitor_reference_real
+      - procurement_hardball_plausibility
+      - contract_terms_relevance
+      - slack_tone_vs_memo_tone
+      - timing_compression_proportion
+      - champion_detractor_both_present    # NO all-positive o all-negative
+      - language_drift
+  post_stage_6:
+    checks: [deal_outcome_coherent, stakeholder_alignment_honest, quote_validation, exaggeration]
+  post_stage_7:
+    checks:
+      - expansion_probability_calibrated
+      - adoption_risk_surfaced
+      - discount_pressure_honest
+      - caveat_erosion
+      - optimism_bias
+      - winner_confidence_calibration
+  anti_bias_invariants:
+    - "Deals que NO closing reportados directo"
+    - "Discount pressure NO se minimiza"
+    - "Detractors identificados con nombre"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 120, rounds_default: 14}
+  pro: {multi_run: 3, panel_size_default: 240, rounds_default: 20}
+  premium: {multi_run: 5, panel_size_default: 320, rounds_default: 24}
+  ultra:
+    multi_run: 10
+    panel_size_default: 400
+    rounds_default: 26
+    features_unlocked: [multi_region_pricing_comparison, renewal_cycle_modeling, churn_risk_forward]
+
+limits:
+  - "Real cycles son 2-9 meses — venue modela proportions, no absolute timing"
+  - "Multi-threaded deals (múltiples buying committees paralelos) no modelados en v0"
+  - "POC/trial mechanics no incluidos — venue asume demo → contract sin POC stage"
+  - "Pricing psychology sutil (anchor effects) approximation"
+  - "Relationship-based selling (warm intros, reference calls) no capturado"
+  - "Expansion Y2 estimado, no simulado directamente"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_icp_18mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "ACV_target > 100K_usd OR enterprise_primary_icp", suggest: premium}
+    - {trigger: "multi_product_portfolio OR global_expansion", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/b2b_pricing/intake.yaml"
+  amplifier: "prompts/b2b_pricing/amplifier.yaml"
+  entity_extractor: "prompts/b2b_pricing/entity_extractor.yaml"
+  persona_generator: "prompts/b2b_pricing/persona.yaml"
+  stimulus_delivery: "prompts/b2b_pricing/stimulus_delivery.yaml"
+  agent_action_vendor_demo_question: "prompts/b2b_pricing/action_vendor_demo_question.yaml"
+  agent_action_internal_slack: "prompts/b2b_pricing/action_internal_slack.yaml"
+  agent_action_procurement_email: "prompts/b2b_pricing/action_procurement_email.yaml"
+  agent_action_cfo_memo: "prompts/b2b_pricing/action_cfo_memo.yaml"
+  agent_action_contract_redline: "prompts/b2b_pricing/action_contract_redline.yaml"
+  agent_action_end_user_gripe: "prompts/b2b_pricing/action_end_user_gripe.yaml"
+  survey_external_validation: "prompts/b2b_pricing/survey_external_validation.yaml"
+  interview: "prompts/b2b_pricing/interview.yaml"
+  narrative_per_variant: "prompts/b2b_pricing/narrative.yaml"
+  executive_judge: "prompts/b2b_pricing/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/b2b_pricing/qa_reviewer.yaml"
+  pattern_extractor: "prompts/b2b_pricing/pattern_extractor.yaml"

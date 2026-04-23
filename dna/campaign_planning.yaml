@@ -1,0 +1,194 @@
+# dna: campaign_planning
+# Version: 1.0.0
+
+test_type: campaign_planning
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 2-3 arquitecturas de campaña (orden, mix de canales, duración)
+    para identificar cuál extrae más valor del budget disponible.
+  decision_question: "¿Qué arquitectura de campaña extrae más valor del budget?"
+  buyer_profile:
+    - "CMO / Head of Growth"
+    - "Agency planning lead"
+    - "Media director / buyer lead"
+  typical_trigger: "Pre-commit de media plan > $500K, re-allocation decision a mid-year"
+  decision_outputs: [GO_ARCHITECTURE_A, GO_ARCHITECTURE_B, GO_ARCHITECTURE_C, HYBRID_RECOMBINE]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "Target consumer con exposure full (heavy spend recipient)"
+      - "Target consumer con exposure partial (mid spend)"
+      - "Target consumer zero exposure (control)"
+      - "Amplifier probable (high social reach)"
+      - "Fatigue voice (agent que saturates early)"
+      - "Competitor customer (potential switcher)"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_brand_campaigns, count: "2-4"}
+      - {type: media_category_outlets, count: "3-5"}
+      - {type: cultural_moment_references, count: "1-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 90
+    per_anchor_cap: [10, 25]
+
+  composition_targets:
+    full_exposure_pct: {min: 28, max: 35}
+    partial_exposure_pct: {min: 28, max: 35}
+    zero_exposure_control_pct: {min: 18, max: 25}
+    amplifiers_pct: {min: 8, max: 15}
+    fatigue_voices_pct: {min: 8, max: 15}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency, EnterpriseBuyingCommittee]
+
+  quality_requirements:
+    bio_length_min_words: 180
+    bio_length_target_words: 240
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 90, min: 70, max: 140}
+  duration: {simulated_time: "N_weeks_campaign_plus_2w_decay", wall_clock_target_minutes: 14}
+  rounds: {min: 14, default: 18, max: 24}
+  propagation: {type: venue_rules, cross_agent_visibility: tier_dependent}
+  exposure_differential: true
+
+setting:
+  category: hybrid_multi_channel
+  description: >
+    Campaign multi-canal con exposure tiers. Agents reciben combinaciones
+    distintas de touchpoints (social + press + WOM + event). Time arc + peak
+    moments + saturation measurement.
+  message_tone_defaults:
+    formality: low
+    emotion_expression: moderate
+
+venue:
+  reference: "venues/campaign_exposure_mix.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image, video]
+  required_fields:
+    - campaign_architectures     # 2-3 variants (burst / slow-burn / tentpole)
+    - budget_mix_per_variant     # % por canal
+    - duration_weeks_per_variant
+    - peak_moment_per_variant
+    - target_audience_hint
+  variants_min: 2
+  variants_max: 3
+  variants_examples:
+    - "Burst 3-week TV-heavy front-loaded"
+    - "Slow-burn 12-week social-dominant always-on"
+    - "Tent-pole event-driven + micro-content sustain"
+  delivery_format: {phased_delivery: "Agent exposure follows architecture's timeline"}
+
+metrics:
+  primary:
+    - incremental_lift_per_touchpoint
+    - saturation_onset_week
+    - amplifier_activation_rate
+    - wasted_touchpoints_identified
+    - cross_channel_multiplier_score
+  secondary:
+    - reach_by_tier
+    - wom_viral_coefficient
+    - fatigue_threshold_week
+    - competitive_response_window_estimate
+    - touchpoint_attribution_breakdown
+  never_emphasize: [absolute_reach_without_incremental_framing]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, architecture_comparison, channel_attribution,
+     saturation_analysis, amplifier_activation, budget_reallocation_recommendations,
+     optimal_sequence, what_to_monitor, honest_caveats, appendices]
+  unique_sections: [channel_attribution_ranking, budget_reallocation, optimal_sequence_map]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - exposure_tiers_balanced
+      - control_group_really_unexposed    # no leakage paths
+      - amplifier_segment_plausibility
+      - fatigue_voice_segment_realistic
+  post_stage_4:
+    checks:
+      - exposure_differential_preserved   # agents no referencian canales que no recibieron
+      - persona_coherence
+      - amplification_realistic
+      - wom_propagation_bounded
+      - fatigue_expressed_in_character
+      - language_drift
+  post_stage_6:
+    checks: [quote_validation, distribution_vs_narrative, exaggeration]
+  post_stage_7:
+    checks:
+      - incremental_lift_computation_transparent
+      - saturation_threshold_justified
+      - budget_reallocation_evidence_based
+      - winner_confidence_calibration
+      - caveat_erosion
+      - optimism_bias
+  anti_bias_invariants:
+    - "Canales con zero incremental lift no se inflan"
+    - "Wasted touchpoints reportados directo"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 70, rounds_default: 14}
+  pro: {multi_run: 3, panel_size_default: 90, rounds_default: 18}
+  premium: {multi_run: 5, panel_size_default: 120, rounds_default: 22}
+  ultra:
+    multi_run: 10
+    panel_size_default: 140
+    rounds_default: 24
+    features_unlocked: [multi_modal_creative_variants, regional_subpanel_comparison]
+
+limits:
+  - "Campaign performance real depende de creative quality (venue asume fixed)"
+  - "Media buying rate fluctuations no modeladas"
+  - "Long-tail brand lift (6+ meses) extrapolado"
+  - "Competitive media noise durante campaign simplificado"
+  - "Cultural moment volatility no modeled"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_brand_12mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "budget > 5M_usd", suggest: premium}
+    - {trigger: "budget > 20M_usd OR global_campaign", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/campaign_planning/intake.yaml"
+  amplifier: "prompts/campaign_planning/amplifier.yaml"
+  entity_extractor: "prompts/campaign_planning/entity_extractor.yaml"
+  persona_generator: "prompts/campaign_planning/persona.yaml"
+  stimulus_delivery: "prompts/campaign_planning/stimulus_delivery.yaml"
+  agent_action_social: "prompts/campaign_planning/action_social.yaml"
+  agent_action_press_read: "prompts/campaign_planning/action_press_read.yaml"
+  agent_action_wom: "prompts/campaign_planning/action_wom.yaml"
+  agent_action_event: "prompts/campaign_planning/action_event.yaml"
+  agent_action_fatigue: "prompts/campaign_planning/action_fatigue.yaml"
+  interview: "prompts/campaign_planning/interview.yaml"
+  narrative_per_variant: "prompts/campaign_planning/narrative.yaml"
+  executive_judge: "prompts/campaign_planning/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/campaign_planning/qa_reviewer.yaml"
+  pattern_extractor: "prompts/campaign_planning/pattern_extractor.yaml"

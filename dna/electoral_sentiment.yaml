@@ -1,0 +1,228 @@
+# dna: electoral_sentiment
+# Version: 1.0.0
+
+test_type: electoral_sentiment
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 2-4 mensajes de campaña electoral con una audiencia segmentada
+    (base / opposition / persuadable / non-voter / single-issue) para predecir
+    vote shift y turnout weighted.
+  decision_question: "¿Este mensaje mueve al votante que necesitamos sin activar al opponent?"
+  buyer_profile:
+    - "Campaign manager"
+    - "Political consultant / strategist"
+    - "PAC strategist"
+    - "Policy comms lead en partido"
+  typical_trigger: "Pre-ad-buy, debate preparation, critical week final, scandal response"
+  decision_outputs: [GO_MESSAGE_A, GO_MESSAGE_B, GO_MESSAGE_C, MIX_SEGMENT_TARGETED, NO_GO_TEST_REFRAME]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 7}
+    examples:
+      - "Base supporter (vote seguro pro)"
+      - "Opposition supporter (vote seguro contra)"
+      - "Persuadable undecided"
+      - "Non-voter potencial (turnout target)"
+      - "Single-issue voter (una cosa les importa)"
+      - "Young voter (first-time potential)"
+      - "Regional demographic relevante"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: media_outlet_aligned, count: "3-5", rationale: "Outlets de distintos alignments"}
+      - {type: polling_institute, count: "1-3"}
+      - {type: opposition_candidate, count: "1-2"}
+      - {type: endorsing_celebrity, count: "0-3"}
+      - {type: advocacy_interest_groups, count: "2-4"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 120
+    per_anchor_cap: [12, 30]
+
+  composition_targets:
+    base_pct: {min: 22, max: 28}
+    opposition_pct: {min: 22, max: 28}
+    persuadable_pct: {min: 25, max: 32}
+    non_voter_pct: {min: 8, max: 12}
+    single_issue_pct: {min: 8, max: 12}
+
+  exclude_entity_types: [EnterpriseBuyingCommittee, PureCommercialConsumer]
+
+  quality_requirements:
+    bio_length_min_words: 280
+    bio_length_target_words: 360
+
+simulation:
+  mode: deliberation     # Pro/Premium; Ultra puede cambiar a forecast
+  panel_size: {default: 120, min: 80, max: 2000}
+  duration: {simulated_time: "campaign_cycle_3w_or_last_7d", wall_clock_target_minutes: 16}
+  rounds: {min: 16, default: 22, max: 30}
+  propagation: {type: venue_rules, cross_agent_visibility: tribal_bubble_asymmetric}
+
+setting:
+  category: hybrid_multi_channel
+  description: >
+    Multi-surface electoral ecosystem: news consumption, family dinners,
+    WhatsApp groups, rallies (attended por subset), debates, campaign DMs.
+    Tribal bubbles con propagation asimétrica within-tribe 3-5x faster.
+  message_tone_defaults:
+    formality: mixed_by_channel
+    emotion_expression: moderate_to_high
+
+venue:
+  reference: "venues/electoral_ecosystem.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, video, audio]
+  required_fields:
+    - message_variants           # 2-4 versions del mensaje
+    - campaign_stage             # primary / general / runoff / special
+    - geography
+    - target_segment_primary
+  variants_min: 2
+  variants_max: 4
+  delivery_format: {initial_drop: "Mensaje via channel primary (rally / ad / debate / social)"}
+
+metrics:
+  primary:
+    - vote_shift_per_segment_pct
+    - turnout_probability_weighted
+    - enthusiasm_gap_score
+    - opposition_mobilization_risk_score
+    - persuadable_conversion_rate_pct
+  secondary:
+    - message_penetration_per_channel
+    - narrative_mutation_tree_whatsapp
+    - debate_moment_impact
+    - poll_driven_momentum_shift
+    - single_issue_voter_response_rate
+  never_emphasize: [raw_reach_without_conversion]
+  outputs_unique:
+    - turnout_weighted_vote_share_estimate
+    - message_efficacy_by_demographics_breakdown
+    - counter_messaging_predictions
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, message_comparison, vote_shift_per_segment,
+     turnout_analysis, enthusiasm_gap, opposition_mobilization_risk, persuadable_journey,
+     counter_messaging_prediction, what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [turnout_weighted_vote_share, demographic_efficacy_matrix, counter_messaging_predictions]
+  length_target: {min_words: 5500, target_words: 7000}
+  quote_requirements: {min_validated: 18}
+  language_policy: {default: match_intake_locale, regional_variants: aware}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - voter_segmentation_matches_brief
+      - geographic_realism
+      - single_issue_voters_identifiable
+      - media_outlet_alignment_realistic
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - tribal_alignment_consistency     # base NO elogia opposition
+      - whatsapp_tone_casual
+      - family_dinner_multi_generation_realistic
+      - poll_reaction_calibrated
+      - opposition_coherence             # opposition NO apoya gratuitously
+      - no_english_in_spanish_whatsapp
+      - single_issue_filter_applied
+      - realistic_information_gaps       # non_voter low-info takes
+      - language_drift
+  post_stage_6:
+    checks:
+      - persuadable_conversion_tracked_per_individual
+      - opposition_mobilization_measured
+      - quote_validation
+      - exaggeration
+  post_stage_7:
+    checks:
+      - turnout_weighted_vote_share_correct
+      - counter_messaging_predictions_present
+      - enthusiasm_gap_explicit
+      - caveat_erosion
+      - optimism_bias
+      - winner_confidence_calibration
+  anti_bias_invariants:
+    - "Electoral reports DEBEN ser POLITICALLY NEUTRAL en tono analítico"
+    - "Si message NO funciona, reporte lo dice sin hedge para 'cuidar' al cliente"
+    - "Opposition mobilization NO se minimiza"
+
+tier_overrides:
+  economy:
+    multi_run: 1
+    panel_size_default: 80
+    rounds_default: 16
+    simulation_mode_override: deliberation
+  pro:
+    multi_run: 3
+    panel_size_default: 120
+    rounds_default: 22
+    simulation_mode_override: deliberation
+  premium:
+    multi_run: 5
+    panel_size_default: 200
+    rounds_default: 26
+    simulation_mode_override: deliberation
+  ultra:
+    multi_run: 10
+    panel_size_default: 2000
+    rounds: 1
+    simulation_mode_override: forecast
+    features_unlocked: [forecast_mode_large_panel, regional_subpanel_comparison, multi_lang, live_operator_intervention]
+    note: "Ultra switches to FORECAST mode — 2000 agents batch para turnout-weighted prediction"
+
+limits:
+  - "Electoral outcomes depend on factors fuera del message: economy, scandals, turnout machinery"
+  - "Precinct-level geographic micro-targeting no modelado"
+  - "Dark money / paid amplification no representado explícitamente"
+  - "Ground game (door-knocking, phone banking) approximated only in campaign_dm"
+  - "Cultural touchstones regionales requieren calibration per mercado"
+  - "Late-breaking events (October surprise) no simulables by design"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_campaign_cycle", max_injected: 6}
+  scoping_rules:
+    strict: "Electoral data es sensitive — compartimentalizada per client"
+
+pricing_recommendation:
+  default_tier: premium
+  notes: "Electoral campaigns rarely economy — stakes son altos"
+  upgrade_triggers:
+    - {trigger: "presidential OR senate_competitive_race", suggest: ultra}
+    - {trigger: "major_metropolitan_mayor OR state_governor", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/electoral_sentiment/intake.yaml"
+  amplifier: "prompts/electoral_sentiment/amplifier.yaml"
+  entity_extractor: "prompts/electoral_sentiment/entity_extractor.yaml"
+  persona_generator: "prompts/electoral_sentiment/persona.yaml"
+  stimulus_delivery: "prompts/electoral_sentiment/stimulus_delivery.yaml"
+  agent_action_whatsapp: "prompts/electoral_sentiment/action_whatsapp.yaml"
+  agent_action_family_dinner: "prompts/electoral_sentiment/action_family_dinner.yaml"
+  agent_action_rally: "prompts/electoral_sentiment/action_rally.yaml"
+  agent_action_debate_reaction: "prompts/electoral_sentiment/action_debate_reaction.yaml"
+  agent_action_news_reaction: "prompts/electoral_sentiment/action_news_reaction.yaml"
+  agent_action_poll_reaction: "prompts/electoral_sentiment/action_poll_reaction.yaml"
+  interview: "prompts/electoral_sentiment/interview.yaml"
+  narrative_per_variant: "prompts/electoral_sentiment/narrative.yaml"
+  executive_judge: "prompts/electoral_sentiment/executive_judge.yaml"
+  forecast_aggregator: "prompts/electoral_sentiment/forecast_aggregator.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/electoral_sentiment/qa_reviewer.yaml"
+  pattern_extractor: "prompts/electoral_sentiment/pattern_extractor.yaml"

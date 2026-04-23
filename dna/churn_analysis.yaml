@@ -1,0 +1,197 @@
+# dna: churn_analysis
+# Version: 1.0.0
+
+test_type: churn_analysis
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 3-4 intervention strategies de retention sobre customers at-risk
+    para identificar qué funciona con quién y a qué costo vs LTV.
+  decision_question: "¿Cómo retenemos a los que están por irse (y con qué intervention)?"
+  buyer_profile:
+    - "Head of Retention / Customer Success lead"
+    - "SaaS CEO revisando churn"
+    - "CX director de subscription business"
+  typical_trigger: "Churn rate alta, re-diseño de retention playbook, pre-launch de win-back campaign"
+  decision_outputs: [DEPLOY_DISCOUNT, DEPLOY_CS_CALL, DEPLOY_FEATURE_UNLOCK, NO_INTERVENTION, SEGMENT_SPECIFIC_MIX]
+
+panel:
+  anchors_spec:
+    count: {min: 4, max: 7, recommended: 5}
+    examples:
+      - "At-risk customer (usage declining, support escalations)"
+      - "Actively cancelling customer (intent expressed)"
+      - "Recently churned (reactivation target)"
+      - "Healthy customer (control)"
+      - "Power user / advocate (control de upper bound)"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_product, count: "2-4"}
+      - {type: review_platform, count: "1-2"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 360
+    per_anchor_cap: [40, 120]
+    note: "60 delib (intervention tests) + 300 survey (baseline / context)"
+
+  composition_targets:
+    at_risk_pct: {min: 25, max: 35}
+    cancelling_pct: {min: 15, max: 25}
+    churned_reactivation_pct: {min: 15, max: 25}
+    healthy_pct: {min: 18, max: 25}
+    power_users_pct: {min: 8, max: 12}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency]
+
+  quality_requirements:
+    bio_length_min_words: 200
+    bio_length_target_words: 260
+
+simulation:
+  mode: hybrid
+  panel_size: {default: 360, min: 180, max: 600}
+  duration: {simulated_time: "30d_intervention_window", wall_clock_target_minutes: 15}
+  rounds: {min: 10, default: 14, max: 20}
+  propagation: {type: none, cross_agent_visibility: review_public_only}
+  hybrid_config:
+    phase_1_deliberation: {agents: "60 (at-risk + cancelling)", purpose: "intervention testing"}
+    phase_2_survey_batch: {agents: "300 (baseline + healthy + power)", purpose: "baseline calibration"}
+
+setting:
+  category: phone_support
+  combined_with: email_async
+  description: >
+    Customer abre ticket / inicia cancel flow / recibe outreach. Support agent
+    (synthetic per variant) responde con strategy. Thread continua hasta
+    retain / churn / abandon. Los healthy/power users responden survey baseline.
+  message_tone_defaults:
+    formality: medium
+    emotion_expression: moderate
+    hedging_norm: medium
+
+venue:
+  reference: "venues/support_ticket.yaml"
+
+stimulus:
+  formats_accepted: [text_paste, pdf]
+  required_fields:
+    - intervention_variants        # 3-4 strategies including "no intervention"
+    - customer_context_per_segment
+    - current_retention_playbook_snapshot
+  variants_min: 3
+  variants_max: 4
+  variants_examples:
+    - "No intervention (control)"
+    - "Discount offer (20% off 3 months)"
+    - "Feature unlock (free upgrade to next tier)"
+    - "CS call outreach with personalized retention plan"
+  delivery_format:
+    round_1: "Each at-risk agent has ticket triggered; support responds per variant"
+
+metrics:
+  primary:
+    - retention_rate_per_intervention
+    - reactivation_rate_for_churned
+    - residual_trust_damage_score
+    - cost_per_saved_customer
+    - ltv_preserved_per_dollar_spent
+  secondary:
+    - early_churn_signal_types_ranked
+    - customer_effort_score_per_variant
+    - nps_delta_post_interaction
+    - public_review_sentiment_distribution
+    - cannibalization_of_healthy_customers
+  never_emphasize: [total_ticket_volume_without_outcome]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, variant_ranking, reaction_by_segment,
+     no_intervention_baseline_comparison, cost_benefit_analysis, segment_specific_playbooks,
+     early_churn_signals, what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [no_intervention_baseline_critical, segment_x_intervention_matrix, early_churn_signals_predictive]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 18}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - customer_segment_plausibility
+      - support_agent_role_realistic
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - support_tone_matches_variant     # empathic variant sounds empathic
+      - escalation_trigger_realistic
+      - customer_escalation_proportional
+      - no_public_leak_private_threads
+      - language_drift
+  post_stage_6:
+    checks: [quote_validation, exaggeration, agent_attribution]
+  post_stage_7:
+    checks:
+      - no_intervention_baseline_present   # CRITICAL — siempre evaluada
+      - segment_specific_recommendations
+      - ltv_calculation_justified
+      - caveat_erosion
+      - optimism_bias
+      - winner_confidence_calibration
+  anti_bias_invariants:
+    - "'No intervention' como winner es resultado LEGÍTIMO"
+    - "Intervention que acelera churn reportado directo"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 180}
+  pro: {multi_run: 3, panel_size_default: 360}
+  premium: {multi_run: 5, panel_size_default: 500}
+  ultra:
+    multi_run: 10
+    panel_size_default: 600
+    features_unlocked: [longitudinal_6mo_extrapolation, cohort_analysis, intervention_sequencing]
+
+limits:
+  - "Real customer relationships tienen history no fully modeled"
+  - "Industry-specific support norms vary (B2B SaaS vs consumer app muy distintos)"
+  - "Long-tail outcomes (6mo+ retention) extrapolados"
+  - "Cultural factors en complaint styles approximated"
+  - "Interventions requieren operational capacity que venue asume disponible"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_product_12mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "monthly_churn_value > 1M_usd", suggest: premium}
+    - {trigger: "enterprise_accounts_at_risk OR public_company", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/churn_analysis/intake.yaml"
+  amplifier: "prompts/churn_analysis/amplifier.yaml"
+  entity_extractor: "prompts/churn_analysis/entity_extractor.yaml"
+  persona_generator: "prompts/churn_analysis/persona.yaml"
+  stimulus_delivery: "prompts/churn_analysis/stimulus_delivery.yaml"
+  agent_action_ticket_initial: "prompts/churn_analysis/action_ticket_initial.yaml"
+  agent_action_support_reply: "prompts/churn_analysis/action_support_reply.yaml"
+  agent_action_customer_followup: "prompts/churn_analysis/action_customer_followup.yaml"
+  agent_action_cs_call: "prompts/churn_analysis/action_cs_call.yaml"
+  agent_action_review_public: "prompts/churn_analysis/action_review_public.yaml"
+  survey_baseline: "prompts/churn_analysis/survey_baseline.yaml"
+  interview: "prompts/churn_analysis/interview.yaml"
+  narrative_per_variant: "prompts/churn_analysis/narrative.yaml"
+  executive_judge: "prompts/churn_analysis/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/churn_analysis/qa_reviewer.yaml"
+  pattern_extractor: "prompts/churn_analysis/pattern_extractor.yaml"

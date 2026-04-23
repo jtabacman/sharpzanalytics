@@ -1,0 +1,199 @@
+# dna: audience_targeting
+# Version: 1.0.0
+
+test_type: audience_targeting
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Comparar resonance del producto/positioning across N audiencias candidatas
+    (ICPs distintos) para priorizar con budget limitado.
+  decision_question: "¿Qué segmento priorizamos con nuestro budget limitado?"
+  buyer_profile:
+    - "CMO / Head of Growth"
+    - "Product marketing lead en expansion stage"
+    - "Strategy lead / CSO"
+    - "Startup founder pre-product-market-fit"
+  typical_trigger: "Post-launch evaluando qué audiencia escalar, pre-go-to-market de producto nuevo"
+  decision_outputs: [PRIORITIZE_ICP_A, PRIORITIZE_ICP_B, MULTI_ICP_BALANCED, START_SMALL_NICHE]
+
+panel:
+  anchors_spec:
+    count: {min: 4, max: 8, recommended: 5}
+    note: "Cada anchor es UN ICP distinto"
+    examples:
+      - "ICP 1 — Enterprise SaaS (500+ employees)"
+      - "ICP 2 — Mid-market (50-500 employees)"
+      - "ICP 3 — SMB tech-forward (5-50 employees)"
+      - "ICP 4 — Startup founder (<5 employees)"
+      - "ICP 5 — Agency / consulting firm"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_product_per_icp, count: "2-4"}
+      - {type: review_platform, count: "2-3"}
+      - {type: category_media, count: "2-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 500
+    per_anchor_cap: [80, 150]
+    note: "~100 agents per ICP para statistical significance cross-ICP"
+
+  composition_targets:
+    per_icp_cluster_isolation: strict
+    per_icp_size_min: 80
+    per_icp_size_max: 150
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency]
+
+  quality_requirements:
+    bio_length_min_words: 180
+    bio_length_target_words: 220
+
+simulation:
+  mode: survey_batch
+  panel_size: {default: 500, min: 200, max: 1000}
+  duration: {wall_clock_target_minutes: 12}
+  rounds: 1
+  propagation: {type: none, cross_agent_visibility: none_cross_icp}
+  survey_config:
+    questions_ref: "prompts/audience_targeting/survey_questions.yaml"
+    response_format: structured
+    batch_size: 100
+    parallelism: 50
+    isolation: "Cluster A NEVER sees cluster B responses — independence strict"
+
+setting:
+  category: individual_journey_parallel
+  description: >
+    Multi-panel sincrónico. Cada ICP cluster es island. Mismo stimulus, responses
+    independientes. Se comparan differentials cross-ICP, no dynamics intra-ICP.
+  message_tone_defaults:
+    formality: variable_by_icp
+    technical_density: variable_by_icp
+
+venue:
+  reference: "venues/cross_audience_comparison.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image]
+  required_fields:
+    - product_description
+    - positioning_statement
+    - value_prop_per_icp_optional  # si tienen positioning diff per ICP
+    - price_ranges
+    - target_icps_candidates       # los N ICPs a testear
+  variants_min: 1
+  variants_max: 3
+  variants_examples:
+    - "Current positioning (control)"
+    - "Positioning v2 alternate"
+    - "ICP-specific messaging (custom per ICP)"
+  delivery_format:
+    same_content_all_clusters: true
+    optional_variant_assignment: random_weighted
+
+metrics:
+  primary:
+    - resonance_score_per_icp
+    - cost_to_acquire_estimate_per_icp
+    - expansion_potential_per_icp
+    - retention_forecast_per_icp
+  secondary:
+    - icp_specific_concerns_ranked
+    - variant_fit_per_icp
+    - comparison_summary
+    - decision_velocity_estimate_per_icp
+    - price_sensitivity_per_icp
+  outputs_unique:
+    - ranked_icp_list_with_business_case
+    - start_here_recommendation
+    - icps_to_avoid
+  never_emphasize: [absolute_survey_pct_without_cross_icp_framing]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, icp_ranking, resonance_per_icp,
+     business_case_per_icp, start_here_recommendation, icps_to_avoid,
+     positioning_refinement_hints, what_to_monitor, honest_caveats, appendices]
+  unique_sections:
+    [ranked_icp_list_with_business_case, start_here_recommendation, icps_to_avoid]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - icp_differentiation_real         # ICPs no overlap
+      - icp_internal_homogeneity         # dentro de un ICP, personas share core traits
+      - icp_relevance_to_product
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - icp_response_differentiation     # responses actually differ cross-ICP
+      - no_generic_reactions             # each response refleja ICP-specific concerns
+      - structured_output_per_icp
+      - no_cross_cluster_contamination   # CRITICAL
+      - language_drift
+  post_stage_6:
+    checks: [quote_validation, distribution_vs_narrative, exaggeration]
+  post_stage_7:
+    checks:
+      - resonance_ranking_methodology_clear
+      - cac_estimate_justified
+      - start_here_rationale_concrete
+      - caveat_erosion
+      - optimism_bias
+      - winner_confidence_calibration
+  anti_bias_invariants:
+    - "ICPs con low fit se reportan directo"
+    - "'Start here' recommendation basado en DATA, no en tier ordering default"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 200}
+  pro: {multi_run: 3, panel_size_default: 500}
+  premium: {multi_run: 5, panel_size_default: 750}
+  ultra:
+    multi_run: 10
+    panel_size_default: 1000
+    features_unlocked: [multi_lang_icp_comparison, longitudinal_resonance_re_test]
+
+limits:
+  - "Static stimulus — no reactive refinement by ICP"
+  - "Single-touchpoint — funnel dynamics (multi-touch discovery) no capturadas"
+  - "Retention differences entre ICPs extrapolated"
+  - "ICP evolution (target markets change) es point-in-time"
+  - "Cross-ICP portfolio effects (selling A helps B) no modelados"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_product_18mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "expansion_budget > 2M_usd OR international_launch", suggest: premium}
+    - {trigger: "pivot_decision OR major_strategic_direction_change", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/audience_targeting/intake.yaml"
+  amplifier: "prompts/audience_targeting/amplifier.yaml"
+  entity_extractor: "prompts/audience_targeting/entity_extractor.yaml"
+  persona_generator: "prompts/audience_targeting/persona.yaml"
+  stimulus_delivery: "prompts/audience_targeting/stimulus_delivery.yaml"
+  survey_questions: "prompts/audience_targeting/survey_questions.yaml"
+  response_generator: "prompts/audience_targeting/response.yaml"
+  narrative_per_icp: "prompts/audience_targeting/narrative_per_icp.yaml"
+  executive_judge: "prompts/audience_targeting/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/audience_targeting/qa_reviewer.yaml"
+  pattern_extractor: "prompts/audience_targeting/pattern_extractor.yaml"

@@ -1,0 +1,199 @@
+# dna: controversial_launch
+# Version: 1.0.0
+
+test_type: controversial_launch
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Evaluar si lanzar una movida que polarizará es net positive, testeando
+    la dinámica backlash / defensa / conversion de persuadables.
+  decision_question: "¿Lanzamos esto aunque va a polarizar? ¿O el costo > beneficio?"
+  buyer_profile:
+    - "CMO tomando pole-position en issue controvertida"
+    - "CEO aprobando statement con impact político/social"
+    - "Public policy lead advocating por posición controversial"
+  typical_trigger: "Pre-launch de producto/campaña/statement con expected divisiveness"
+  decision_outputs: [GO_BOLD, GO_MEASURED, DELAY_AND_REFRAME, NO_GO]
+
+panel:
+  anchors_spec:
+    count: {min: 6, max: 8, recommended: 7}
+    examples:
+      - "Base supportive (target audience del message)"
+      - "Base opposition (rival tribe)"
+      - "Persuadable neutral"
+      - "Activist amplifier pro-side"
+      - "Activist amplifier anti-side"
+      - "Press / mainstream media"
+      - "Celebrity / influencer cultural"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: advocacy_group_both_sides, count: "2-4", rationale: "Pro AND contra"}
+      - {type: media_outlet, count: "4-6"}
+      - {type: cultural_amplifier, count: "2-4"}
+      - {type: legal_watchdog, count: "1-2"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 100
+    per_anchor_cap: [10, 25]
+
+  composition_targets:
+    base_supportive_pct: {min: 25, max: 35}
+    base_opposition_pct: {min: 25, max: 35}
+    persuadables_pct: {min: 18, max: 25}
+    amplifiers_pct: {min: 12, max: 20}
+    press_pct: {min: 8, max: 12}
+
+  exclude_entity_types: [EnterpriseBuyingCommittee, InvestorFund]
+
+  quality_requirements:
+    bio_length_min_words: 250
+    bio_length_target_words: 320
+
+simulation:
+  mode: deliberation
+  panel_size: {default: 100, min: 70, max: 150}
+  duration: {simulated_time: "14d_backlash_arc", wall_clock_target_minutes: 14}
+  rounds: {min: 16, default: 22, max: 28}
+  propagation: {type: venue_rules, cross_agent_visibility: full_public}
+
+setting:
+  category: digital_feed
+  description: >
+    Contexto polarizado extremo. Dos bases se activan simultáneamente, amplifiers
+    llevan outrage. Cascades viral entre tribes. Persuadables miran a ver quién
+    gana el discurso.
+  message_tone_defaults:
+    formality: low
+    emotion_expression: high
+    hedging_norm: low
+
+venue:
+  reference: "venues/polarized_social.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image, video]
+  required_fields:
+    - launch_content             # el producto/campaign/statement controvertido
+    - known_polarization_axis    # qué divide (político / cultural / ético)
+    - baseline_pro_vs_contra_split
+  variants_min: 1
+  variants_max: 3
+  variants_examples:
+    - "Bold / unapologetic framing"
+    - "Measured / acknowledges-both-sides framing"
+    - "Focus-on-utility / sidestep-controversy framing"
+  delivery_format: {initial_drop: "Launch via channel natural"}
+
+metrics:
+  primary:
+    - net_sentiment_score              # support minus opposition weighted
+    - amplification_ratio_pro_vs_contra
+    - boycott_probability
+    - persuadable_conversion_rate
+    - dominant_narrative_post_cycle
+  secondary:
+    - backlash_half_life
+    - celebrity_amplification_impact
+    - counter_mobilization_severity
+    - press_crossover_signal
+    - sustained_damage_index
+  never_emphasize: [raw_engagement_without_stance]
+
+report:
+  required_sections:
+    [executive_summary, context_of_launch, variant_comparison, reaction_by_segment,
+     polarization_dynamics, persuadable_journey, backlash_arc, recommended_path,
+     no_go_analysis, what_to_monitor, honest_caveats, appendices]
+  unique_sections: [polarization_topology, persuadable_journey, backlash_half_life_analysis]
+  length_target: {min_words: 5500, target_words: 6500}
+  quote_requirements: {min_validated: 18}
+  language_policy: {default: match_intake_locale, quotes_preserve_original: true}
+  special_output:
+    no_go_legitimate: true
+    silence_option_always_evaluated: true
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - polarized_panel_composition    # deliberately 30/30 base split
+      - advocacy_both_sides_present
+      - celebrity_relevance
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - tribal_authenticity             # base no wobbly; opposition no softens
+      - factual_hallucination
+      - language_drift
+      - amplification_realism
+      - no_scripted_outrage             # variety dentro de tribu
+      - silence_option_modeled_if_relevant
+  post_stage_6:
+    checks: [quote_validation, exaggeration, agent_attribution]
+  post_stage_7:
+    checks:
+      - no_go_evaluated_honestly
+      - persuadable_loss_quantified
+      - opposition_mobilization_surfaced
+      - winner_confidence_calibration
+      - caveat_erosion
+      - optimism_bias
+  anti_bias_invariants:
+    - "Si net sentiment es negative, reportar directo"
+    - "NO suavizar backlash"
+    - "NO-GO como output LEGÍTIMO cuando data lo amerite"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 70, rounds_default: 16}
+  pro: {multi_run: 3, panel_size_default: 100, rounds_default: 22}
+  premium: {multi_run: 5, panel_size_default: 130, rounds_default: 26}
+  ultra:
+    multi_run: 10
+    panel_size_default: 150
+    rounds_default: 28
+    features_unlocked: [multi_lang, multi_modal, regional_subpanel_comparison, live_operator_intervention]
+
+limits:
+  - "Cultural context matters — polarization tropes son region-specific"
+  - "Real-world amplification por bots maliciosos no representado"
+  - "Regulatory/legal intervention (FTC, EU, etc.) no modelada"
+  - "Pre-existing brand equity affecta outcomes más allá del venue scope"
+  - "Celebrity alignment politics son volatile en real time"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_category_24mo", max_injected: 6}
+
+pricing_recommendation:
+  default_tier: premium
+  notes: "Controversial_launch rarely economy — downside de mal launch es severo"
+  upgrade_triggers:
+    - {trigger: "public_company OR viral_risk_high", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/controversial_launch/intake.yaml"
+  amplifier: "prompts/controversial_launch/amplifier.yaml"
+  entity_extractor: "prompts/controversial_launch/entity_extractor.yaml"
+  persona_generator: "prompts/controversial_launch/persona.yaml"
+  stimulus_delivery: "prompts/controversial_launch/stimulus_delivery.yaml"
+  agent_action_post: "prompts/controversial_launch/action_post.yaml"
+  agent_action_boycott: "prompts/controversial_launch/action_boycott.yaml"
+  agent_action_defense: "prompts/controversial_launch/action_defense.yaml"
+  agent_action_celebrity: "prompts/controversial_launch/action_celebrity.yaml"
+  agent_action_press: "prompts/controversial_launch/action_press.yaml"
+  interview: "prompts/controversial_launch/interview.yaml"
+  narrative_per_variant: "prompts/controversial_launch/narrative.yaml"
+  executive_judge: "prompts/controversial_launch/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/controversial_launch/qa_reviewer.yaml"
+  pattern_extractor: "prompts/controversial_launch/pattern_extractor.yaml"

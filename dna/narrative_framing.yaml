@@ -1,0 +1,180 @@
+# dna: narrative_framing
+# Version: 1.0.0
+
+test_type: narrative_framing
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Testear 2-4 framings distintos del MISMO underlying fact para descubrir
+    cuál resuena mejor y cómo muta al propagarse.
+  decision_question: "¿Cómo contamos esta historia?"
+  buyer_profile:
+    - "Head of Communications / PR lead"
+    - "Product marketing lead de un lanzamiento complejo"
+    - "Policy comms lead (ONG, gobierno, advocacy)"
+  typical_trigger: "Pre-announcement major, launch de feature ambiguo, post-evento needing framing"
+  decision_outputs: [GO_FRAMING_A, GO_FRAMING_B, GO_FRAMING_C, MIX_TARGETED]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 7}
+    examples:
+      - "Target audience del mensaje"
+      - "Opinion leader que amplificaría"
+      - "Skeptic voice / contrarian"
+      - "Press / analyst"
+      - "Adjacent stakeholder (tangencial pero afectado)"
+      - "Activist / advocacy con stake"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: media_outlet, count: "3-5"}
+      - {type: competing_narrative_source, count: "2-4"}
+      - {type: expert_voice, count: "2-4"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 100
+    per_anchor_cap: [10, 25]
+
+  composition_targets:
+    target_audience_pct: {min: 35, max: 45}
+    opinion_leaders_pct: {min: 18, max: 25}
+    skeptic_voices_pct: {min: 12, max: 18}
+    press_pct: {min: 12, max: 18}
+    adjacent_pct: {min: 8, max: 15}
+
+  exclude_entity_types: [RetailConsumerUnrelated, IndividualInvestorRetail]
+
+  quality_requirements:
+    bio_length_min_words: 200
+    bio_length_target_words: 280
+
+simulation:
+  mode: hybrid
+  panel_size: {default: 100, min: 60, max: 150}
+  duration: {simulated_time: "14d_narrative_arc", wall_clock_target_minutes: 14}
+  rounds: {min: 12, default: 16, max: 22}
+  propagation: {type: venue_rules, cross_agent_visibility: controlled}
+  hybrid_config:
+    phase_1_survey_batch: {agents: "80% (target + skeptic)", purpose: "baseline stickiness"}
+    phase_2_deliberation: {agents: "20% (leaders + press)", purpose: "mutation + amplification tree"}
+
+setting:
+  category: digital_feed
+  description: >
+    Narrative propagates through: social posts, journalist commentary, peer
+    conversations, quote-posts con twist. Combina feed público con thread-level
+    deliberation entre opinion leaders + press.
+  message_tone_defaults:
+    formality: medium
+    technical_density: medium
+    emotion_expression: moderate
+
+venue:
+  reference: "venues/social_viral.yaml"
+  combined_with_secondary: "venues/press_cycle.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste]
+  required_fields:
+    - underlying_fact           # el evento / dato bruto
+    - framing_variants           # 2-4 framings del mismo fact
+    - target_audience_primary
+  variants_min: 2
+  variants_max: 4
+  delivery_format:
+    initial_drop: "Mensaje framed publicado via channel natural (press release / tweet / blog)"
+
+metrics:
+  primary:
+    - message_stickiness_round5       # cuántos agents lo repiten accurate round+5
+    - narrative_drift_tree            # cómo muta entre agents
+    - emotional_valence_per_framing
+    - clarity_comprehension_pct
+    - share_of_coverage_per_framing
+  secondary:
+    - cross_segment_bridging_power
+    - counter_framing_strength
+    - time_to_narrative_consolidation
+  never_emphasize: [raw_volume, pure_reach]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, framing_comparison, reaction_by_segment,
+     narrative_mutation_tree, resonance_matrix, best_per_segment, what_to_monitor,
+     honest_caveats, appendices]
+  unique_sections:
+    [narrative_mutation_tree, framings_x_segments_matrix, press_adoption_analysis]
+  length_target: {min_words: 5000, target_words: 6000}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale, quotes_preserve_original: true}
+
+one_pager:
+  structure: SHARED_V1
+  length: {min_words: 400, max_words: 600}
+
+qa_review:
+  post_stage_2:
+    checks: [phantom_entities, off_target_archetype, media_outlet_relevance, duplicates_encoding]
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - factual_hallucination
+      - narrative_mutation_traceable    # cada mutation tiene source identifiable
+      - language_drift
+      - copy_propagation
+      - framing_not_blended             # agent A no debería usar framings de variant B
+  post_stage_6:
+    checks: [quote_validation, mutation_tree_faithful, exaggeration]
+  post_stage_7:
+    checks: [winner_confidence_calibration, caveat_erosion, optimism_bias, structural_compliance]
+  anti_bias_invariants:
+    - "No suavizar framings que genuinely failed"
+    - "Mutation tree refleja lo observado, no lo deseado"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 60, rounds_default: 12}
+  pro: {multi_run: 3, panel_size_default: 100, rounds_default: 16}
+  premium: {multi_run: 5, panel_size_default: 130, rounds_default: 20}
+  ultra:
+    multi_run: 10
+    panel_size_default: 150
+    rounds_default: 22
+    features_unlocked: [multi_lang, cross_regional_mutation_comparison]
+
+limits:
+  - "Narrative drift real en social puede ser más caótico que modelado"
+  - "Events that would derail narrative mid-cycle no predichos"
+  - "Cultural context-specific — framings que funcionan en un mercado pueden fallar en otro"
+  - "Regulator / legal responses al framing no modelados"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_category_12mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "national_launch OR contentious_topic", suggest: premium}
+    - {trigger: "policy_announcement OR crisis_adjacent", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/narrative_framing/intake.yaml"
+  amplifier: "prompts/narrative_framing/amplifier.yaml"
+  entity_extractor: "prompts/narrative_framing/entity_extractor.yaml"
+  persona_generator: "prompts/narrative_framing/persona.yaml"
+  stimulus_delivery: "prompts/narrative_framing/stimulus_delivery.yaml"
+  agent_action_post: "prompts/narrative_framing/action_post.yaml"
+  agent_action_thread: "prompts/narrative_framing/action_thread.yaml"
+  agent_action_press_take: "prompts/narrative_framing/action_press_take.yaml"
+  interview: "prompts/narrative_framing/interview.yaml"
+  narrative_per_variant: "prompts/narrative_framing/narrative.yaml"
+  executive_judge: "prompts/narrative_framing/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/narrative_framing/qa_reviewer.yaml"
+  pattern_extractor: "prompts/narrative_framing/pattern_extractor.yaml"

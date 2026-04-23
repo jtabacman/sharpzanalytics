@@ -4,23 +4,25 @@ Los 15 test_types del producto, cada uno como archivo YAML declarativo. Schema c
 
 ## Status de los 15 test_types
 
-| # | test_type | venue primario | sim mode | status | prioridad v0 |
-|---|---|---|---|---|---|
-| 1 | [investor_pitch](investor_pitch.yaml) | pitch_meeting | deliberation | **active** | 🟢 m1 |
-| 2 | [pricing_test](pricing_test.yaml) | retail_decision | survey_batch | **active** | 🟢 m1 |
-| 3 | [crisis_response](crisis_response.yaml) | split_public_private | deliberation | **active** | 🟢 m1 |
-| 4 | creative_test | social_viral | survey_batch | pending | m2 |
-| 5 | narrative_framing | social_viral + press_cycle | hybrid | pending | m2 |
-| 6 | brand_sentiment_shift | social_viral + press_cycle | deliberation | pending | m2 |
-| 7 | competitive_response | hybrid_multi_channel | deliberation | pending | m2 |
-| 8 | controversial_launch | polarized_social | deliberation | pending | m2 |
-| 9 | product_launch | product_usage_simulation | usage_simulation | pending | m2 |
-| 10 | campaign_planning | campaign_exposure_mix | deliberation | pending | m2 |
-| 11 | churn_analysis | support_ticket | hybrid | pending | m2 |
-| 12 | electoral_sentiment | electoral_ecosystem | deliberation/forecast | pending | m2 |
-| 13 | policy_rollout | town_hall | hybrid | pending | m2 |
-| 14 | audience_targeting | cross_audience_comparison | survey_batch | pending | m2 |
-| 15 | b2b_pricing | b2b_sales_cycle | hybrid | pending | m2 |
+| # | test_type | venue primario | sim mode | status |
+|---|---|---|---|---|
+| 1 | [investor_pitch](investor_pitch.yaml) | pitch_meeting | deliberation | **active** |
+| 2 | [pricing_test](pricing_test.yaml) | retail_decision | survey_batch | **active** |
+| 3 | [crisis_response](crisis_response.yaml) | split_public_private | deliberation | **active** |
+| 4 | [creative_test](creative_test.yaml) | social_viral | survey_batch | **active** |
+| 5 | [narrative_framing](narrative_framing.yaml) | social_viral + press_cycle | hybrid | **active** |
+| 6 | [brand_sentiment_shift](brand_sentiment_shift.yaml) | social_viral + press_cycle | deliberation | **active** |
+| 7 | [competitive_response](competitive_response.yaml) | press_cycle + social_viral | deliberation | **active** |
+| 8 | [controversial_launch](controversial_launch.yaml) | polarized_social | deliberation | **active** |
+| 9 | [product_launch](product_launch.yaml) | product_usage_simulation | usage_simulation | **active** |
+| 10 | [campaign_planning](campaign_planning.yaml) | campaign_exposure_mix | deliberation | **active** |
+| 11 | [churn_analysis](churn_analysis.yaml) | support_ticket | hybrid | **active** |
+| 12 | [electoral_sentiment](electoral_sentiment.yaml) | electoral_ecosystem | deliberation/forecast | **active** |
+| 13 | [policy_rollout](policy_rollout.yaml) | town_hall | hybrid | **active** |
+| 14 | [audience_targeting](audience_targeting.yaml) | cross_audience_comparison | survey_batch | **active** |
+| 15 | [b2b_pricing](b2b_pricing.yaml) | b2b_sales_cycle | hybrid | **active** |
+
+**15/15 DNAs completos.** Los test_types son declarativamente funcionales. Ejecución completa de cada uno requiere los action prompts específicos del venue (en `prompts/<test_type>/`) que se completan progresivamente.
 
 ## Los 3 DNAs activos (v0) — por qué estos
 

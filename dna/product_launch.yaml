@@ -1,0 +1,195 @@
+# dna: product_launch
+# Version: 1.0.0
+
+test_type: product_launch
+version: "1.0.0"
+status: active
+
+client_facing:
+  one_liner: >
+    Simular día-por-día el uso del producto con usuarios sintéticos antes
+    del launch para identificar killer features, friction points y posicionamiento.
+  decision_question: "¿Este producto está listo para salir, y qué debemos ajustar?"
+  buyer_profile:
+    - "Head of Product / CPO"
+    - "Product launch lead"
+    - "CEO de startup pre-launch"
+    - "Product marketing lead"
+  typical_trigger: "Pre-launch de producto major, beta closed → open transition, feature set debate pre-lock"
+  decision_outputs: [GO, CONDITIONAL_GO_WITH_CUTS, DELAY_AND_REFINE, NO_GO]
+
+panel:
+  anchors_spec:
+    count: {min: 5, max: 8, recommended: 6}
+    examples:
+      - "Early adopter tech-forward del category"
+      - "Mainstream user (target demographic)"
+      - "Power user / sophisticated (stretches product)"
+      - "Skeptic / conservative buyer"
+      - "Press / reviewer de categoría"
+      - "Churn-risk persona (likely to bail quick)"
+
+  ecosystem_spec:
+    extract_from_stimulus: true
+    target_types:
+      - {type: competing_product, count: "3-5"}
+      - {type: review_platform, count: "2-3"}
+      - {type: category_media, count: "2-3"}
+
+  amplification:
+    strategy: deterministic_llm
+    target_pool: 150
+    per_anchor_cap: [18, 30]
+
+  composition_targets:
+    early_adopters_pct: {min: 35, max: 45}
+    mainstream_pct: {min: 25, max: 35}
+    power_users_pct: {min: 12, max: 18}
+    skeptics_pct: {min: 8, max: 15}
+    press_reviewers_pct: {min: 3, max: 8}
+
+  exclude_entity_types: [InvestorFund, RegulatorGovernmentAgency]
+
+  quality_requirements:
+    bio_length_min_words: 200
+    bio_length_target_words: 260
+
+simulation:
+  mode: usage_simulation
+  panel_size: {default: 150, min: 80, max: 300}
+  duration: {simulated_time: "7d_usage_journey", wall_clock_target_minutes: 18}
+  simulated_days: 7
+  touchpoints_per_day: {min: 2, max: 5}
+  individual_only: true
+  propagation: {type: none, cross_agent_visibility: review_and_wom_only_post_day_7}
+
+setting:
+  category: individual_journey
+  description: >
+    Cada agente simula su interacción day-by-day con el producto. Individual,
+    no cross-agent durante uso. Post-day-7 puede dejar review público + WOM.
+  message_tone_defaults:
+    formality: low
+    technical_density: variable_by_persona
+    emotion_expression: moderate
+
+venue:
+  reference: "venues/product_usage_simulation.yaml"
+
+stimulus:
+  formats_accepted: [pdf, text_paste, image, video_demo]
+  required_fields:
+    - product_description
+    - feature_set
+    - onboarding_flow_description
+    - pricing_tier_assignment
+    - go_to_market_plan
+  optional_fields: [target_use_cases, competitive_diff, technical_specs, pricing_tiers_details]
+  variants_min: 1
+  variants_max: 3
+  variants_examples:
+    - "Current feature set (control)"
+    - "Feature set v2 (additions)"
+    - "Feature set minus-heavy (simplified)"
+  delivery_format:
+    round_1: "Onboarding initial. Each agent starts their personal journey"
+
+metrics:
+  primary:
+    - adoption_velocity_estimate
+    - feature_delight_vs_frustration_per_feature
+    - nps_estimate_distribution
+    - use_case_fit_per_segment
+    - must_have_vs_nice_to_have_ranking
+  secondary:
+    - abandon_rate_per_segment
+    - friction_points_hotspot
+    - power_user_feature_discovery_rate
+    - support_ticket_generation_rate_estimate
+    - upgrade_intent_between_tiers
+  never_emphasize: [pure_engagement_time_without_outcome]
+
+report:
+  required_sections:
+    [executive_summary, context_of_experiment, adoption_curve, journey_per_segment,
+     feature_delight_frustration_matrix, killer_features, friction_hotspots,
+     feature_cut_recommendations, nps_breakdown, what_to_monitor, honest_caveats, appendices]
+  unique_sections: [day_in_the_life_per_segment, killer_feature_identification, feature_cut_list]
+  length_target: {min_words: 5500, target_words: 6500}
+  quote_requirements: {min_validated: 15}
+  language_policy: {default: match_intake_locale}
+
+one_pager: {structure: SHARED_V1, length: {min_words: 400, max_words: 600}}
+
+qa_review:
+  post_stage_2:
+    checks:
+      - phantom_entities
+      - user_segmentation_matches_product
+      - persona_use_case_alignment
+      - duplicates_encoding
+  post_stage_4:
+    checks:
+      - persona_coherence
+      - day_temporal_consistency     # día 3 referencia días 1 y 2
+      - feature_reactions_structured_correctly
+      - no_collective_reasoning       # agent no cita what others think
+      - abandon_rate_realistic        # not everyone powers through friction
+      - language_drift
+  post_stage_6:
+    checks: [quote_validation, exaggeration]
+  post_stage_7:
+    checks:
+      - killer_feature_evidence_based
+      - friction_cut_recommendations_specific
+      - nps_distribution_honest
+      - caveat_erosion
+      - optimism_bias
+  anti_bias_invariants:
+    - "Skeptics que abandonan early se quedan así"
+    - "Frustrations NO se minimizan para no asustar al cliente"
+
+tier_overrides:
+  economy: {multi_run: 1, panel_size_default: 80, simulated_days: 5}
+  pro: {multi_run: 3, panel_size_default: 150, simulated_days: 7}
+  premium: {multi_run: 5, panel_size_default: 225, simulated_days: 10}
+  ultra:
+    multi_run: 10
+    panel_size_default: 300
+    simulated_days: 14
+    features_unlocked: [multi_modal_product_screens, onboarding_a_b, cohort_longitudinal_sim]
+
+limits:
+  - "Simulated usage ≠ real usage — gap category-specific"
+  - "Social context (team adoption, viral discovery) no captured"
+  - "Time horizon max 14d — long-term retention extrapolated"
+  - "Competitive alternatives mid-journey no modelados"
+  - "Learning curve dynamics simplified"
+
+cross_test_learning:
+  patterns_to_extract: {count_per_test: "5-10"}
+  priors_relevance: {window: "same_client_same_product_line_12mo", max_injected: 8}
+
+pricing_recommendation:
+  default_tier: pro
+  upgrade_triggers:
+    - {trigger: "launch_budget > 5M_usd OR flagship_product", suggest: premium}
+    - {trigger: "public_company_launch_announcement", suggest: ultra}
+
+prompts:
+  intake_schema: "prompts/product_launch/intake.yaml"
+  amplifier: "prompts/product_launch/amplifier.yaml"
+  entity_extractor: "prompts/product_launch/entity_extractor.yaml"
+  persona_generator: "prompts/product_launch/persona.yaml"
+  stimulus_delivery: "prompts/product_launch/stimulus_delivery.yaml"
+  agent_action_daily_usage: "prompts/product_launch/action_daily_usage.yaml"
+  agent_action_feature_reaction: "prompts/product_launch/action_feature_reaction.yaml"
+  agent_action_day7_reflection: "prompts/product_launch/action_day7_reflection.yaml"
+  agent_action_optional_review: "prompts/product_launch/action_optional_review.yaml"
+  interview: "prompts/product_launch/interview.yaml"
+  narrative_per_variant: "prompts/product_launch/narrative.yaml"
+  executive_judge: "prompts/product_launch/executive_judge.yaml"
+  one_pager: "prompts/shared/one_pager_v1.yaml"
+  qa_reviewer_base: "prompts/shared/qa_reviewer_base.yaml"
+  qa_reviewer_venue_specific: "prompts/product_launch/qa_reviewer.yaml"
+  pattern_extractor: "prompts/product_launch/pattern_extractor.yaml"
